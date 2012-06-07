@@ -18,7 +18,7 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
 [6 7] [4 7] [2 7] [0 7]
 ])
 
-(def :^const board-mappings-chess nil) ;TODO
+(def ^:const board-mappings-chess nil) ;TODO
 
 (def ^:dynamic black-direction -1)
 (def ^:dynamic white-direction 1)
@@ -52,9 +52,9 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
 (defn translate-position
 "Translates a position from 1d to 2d and vice-versa. 
 Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'." 
-([i mappings]   ;will translate from 1d to 2d
+([i mappings] {:post [(not (nil? %))]}   ;will translate from 1d to 2d
 (get mappings i)) 
-([x y mappings] ;will translate from 2d to 1d
+([x y mappings] {:post [(not (== % -1))]} ;will translate from 2d to 1d
 (.indexOf mappings (vector x y))
 )) 
 
