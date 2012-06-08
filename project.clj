@@ -7,7 +7,7 @@
                  ;[clojure-encog "0.4.0-SNAPSHOT"]
                  ]
                  
-  :jvm-opts ["-Xmx1g"] 
+  :jvm-opts ["-Xmx1g" "-server"] 
  ;:javac-options {:classpath "target/dependency/encog-core-3.1.0.jar" :destdir "target/classes"}
  ;:java-source-path "src/java"
  ;:main     Clondie24.core             
