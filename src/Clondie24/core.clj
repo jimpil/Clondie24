@@ -8,34 +8,86 @@
 "A vector of vectors. Outer vector represents the 32 (serial) positions checkers can position themselves on. 
 Each inner vector represents the coordinates of that position on the 8x8 grid."
 [ ;;
-[1 0] [3 0] [5 0] [7 0] 
-[6 1] [4 1] [2 1] [0 1]
-[1 2] [3 2] [5 2] [7 2] 
-[6 3] [4 3] [2 3] [0 3]
-[1 4] [3 4] [5 4] [7 4]
-[6 5] [4 5] [2 5] [0 5]
-[1 6] [3 6] [5 6] [7 6]
-[6 7] [4 7] [2 7] [0 7]
+[1.0 0.0] [3.0 0.0] [5.0 0.0] [7.0 0.0] 
+[6.0 1.0] [4.0 1.0] [2.0 1.0] [0.0 1.0]
+[1.0 2.0] [3.0 2.0] [5.0 2.0] [7.0 2.0] 
+[6.0 3.0] [4.0 3.0] [2.0 3.0] [0.0 3.0]
+[1.0 4.0] [3.0 4.0] [5.0 4.0] [7.0 4.0]
+[6.0 5.0] [4.0 5.0] [2.0 5.0] [0.0 5.0]
+[1.0 6.0] [3.0 6.0] [5.0 6.0] [7.0 6.0]
+[6.0 7.0] [4.0 7.0] [2.0 7.0] [0.0 7.0]
 ])
+
+(declare make-piece, translate-position) ;will need this fn 
+
+;Helper macro for creting Points
+(defmacro make-point [p]
+`(java.awt.Point. (first ~p) (second ~p)))
+
+;Helper macro for creting pre-defined Colours
+(defmacro make-color [predefined-name]
+`(.get (.getField (Class/forName "java.awt.Color") (str ~predefined-name)) nil))
 
 (def ^:const board-mappings-chess nil) ;TODO
 
 (def ^:dynamic black-direction -1)
 (def ^:dynamic white-direction 1)
 
-(def valid-checkers-positions (range 32))
-(def invalid-checkers-positions (take 32 (repeat -1)))
+(def valid-checkers-positions    (range 32))
+(def invalid-checkers-positions  (repeat 32 -1))
 
 (def checkers-1d ;the checkers-board as a list. -1 represents invalid positions
 (interleave invalid-checkers-positions 
             valid-checkers-positions))
+
+;RED is machine (north camp), YELLOW is human (south camp)            
+(def checkers-colors [(make-color 'RED)  
+                      (make-color 'YELLOW)]) 
+
+;BLACK is machine (north camp), WHITE is human (south camp)                       
+(def chess-colors [(make-color 'BLACK)  
+                   (make-color 'WHITE)])                       
+ 
+(declare all-chessItems) ;TODO                                                 
             
-#_(def starting-board [game] 
-(if (= game :checkers) 
-(zipmap (range 32) 
-(cons (take 12 (repeat 
-      (make-piece false java.awt.Color/Yellow (make-point 1 5) :rank 'soldier))) '() ))
+(defn starting-pieces
+"Will construct a set of initial pieces (12 or 16). opponent? specifies the side of the board where the pieces should be placed (true for north false for south). Optional arguments include board mappings and chess? (they default to checkers-mappings and false). If one changed the other should be changed as well.  " 
+[opponent? &{:keys [mappings chess?]
+             :or {mappings board-mappings-checkers chess? false}}]                                   
+(if opponent? 
+   (for [p (range 0 12)]  
+        (make-piece (first checkers-colors)  
+        (make-point (translate-position p mappings)) :chess? chess? :rank 'soldier))
+   (for [p (range 20 32)] 
+        (make-piece (second checkers-colors) 
+        (make-point (translate-position p mappings)) :chess? chess? :rank 'soldier))
 ))
+
+
+(def all-checkers
+(concat (starting-pieces true) 
+        (starting-pieces false)))
+
+(defn starting-board-checkers 
+"Creates the initial board for checkers with correct starting positions."
+[] ;opponent pieces come first, then 8 nils and our pieces last (conj appends at tail)
+(conj (starting-pieces false) 
+(conj (repeat 8 nil) (starting-pieces true))))
+
+(defn dead-piece? [p]
+((meta p) :dead))
+
+
+(defn build-board [pionia]
+(loop [nb (vec (repeat 32 nil)) ;building a new board after each move
+      p pionia]
+(if (empty? p) (seq nb)
+(recur (assoc nb (.getListPosition (first p))    ;the piece's position
+(if (dead-piece? (first p))  nil ;if the piece is dead stick nil
+                (first p)))  ; else stick the piece in
+               (rest p)))))  ;carry on recursing
+           
+            
 
 (def chess-1d (range 64)) ;;the chess board as a list
 
@@ -58,11 +110,16 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (.indexOf mappings (vector x y))
 )) 
 
- 
-(declare make-piece) ;will need this fn in here (when promoting)
-(defprotocol Piece "The Piece abstraction. "
+(defmacro in? ;handy function to test if some elem exists in some collection 
+ "Returns true if colle contains elm, false otherwise."
+ [colle elm]  
+`(if (some #{~elm} ~colle) true false))  
+
+(defprotocol Piece "The Piece abstraction."
  (update-position [this new-position])
- (getPosition [this])
+ (getGridPosition [this])
+ (getListPosition [this])
+ (getPoint [this])
  (die [this])
  (promote [this])
  (getMoves [this]) ;pretends there is only ONE piece on the board - will need filtering for validity later
@@ -75,12 +132,14 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  (update-position [this np] ;mutable state inside Point!
    (. position setLocation  ;can accept ints or doubles
      (first np) (second np))) ;np should be [x, y]
- (die [this]     (vary-meta this assoc :dead true)) ;communicate death through meta-data 
- (promote [this] (make-piece false color position :rank 'prince)) ; a checker is promoted to prince
- (getPosition [this] (vector (.getX position) (.getY position))) 
+ (die     [this] (vary-meta this assoc :dead true)) ;communicate death through meta-data 
+ (promote [this] (make-piece color position :rank 'prince)) ; a checker is promoted to prince
+ (getGridPosition [this] (vector (.getX position) (.getY position)))
+ (getListPosition [this] (translate-position (.getX position) (.getY position) board-mappings-checkers))
+ (getPoint [this] position)
  (getMoves [this] nil) ;TODO
  (toString [this] 
-   (println (str color) "piece at" (str (.getLocation position)))))
+   (println rank "at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
  
 (defrecord ChessPiece [^java.awt.Image image 
                        ^java.awt.Point position 
@@ -90,39 +149,38 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
    (. position setLocation  ;can accept ints or doubles
      (first np) (second np))) ;np should be [x, y]
  (die [this]     (vary-meta this assoc :dead true)) ;communicate death through meta-data 
- (promote [this] (make-piece true image position :rank 'queen)) ;a pawn is promoted to a queen
- (getPosition [this] (vector (.getX position) (.getY position)))
+ (promote [this] (make-piece image position :chess? true :rank 'queen)) ;a pawn is promoted to a queen
+ (getGridPosition [this] (vector (.getX position) (.getY position)))
+ (getListPosition [this] (translate-position (.getX position) (.getY position) board-mappings-chess))
+ (getPoint [this] position)
  (getMoves [this] nil) ;TODO 
  (toString [this] 
-   (println rank "at position" (str (.getLocation position)))))
+   (println rank "at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
 
-;Helper macro for creting Points
-(defmacro make-point [x y]
-`(new java.awt.Point ~x ~y))
-
-;Helper macro for creting predefined Colours
-(defmacro make-color [predefined-name]
-`(.get (.getField (Class/forName "java.awt.Color") (str ~predefined-name)) nil))
 
 (defn make-piece 
 "The central function for creating pieces. A piece is simply a record with 3 keys: colour, position [x,y] and rank (optional)."
- [chess? c p &{:keys [rank]
-               :or {rank 'zombie}}]
+ [c p &{:keys [rank chess?]
+               :or {rank 'zombie 
+                    chess? false}}]
 (if chess?
 (with-meta (ChessPiece. c p rank)    {:dead false})  ;pieces are born 'alive'
 (with-meta (CheckersPiece. c p rank) {:dead false})))
 
 ;EXAMPLEs:
- ;(make-piece false java.awt.Color/BLUE (make-point 1 5) :rank 'soldier)
- ;(make-piece true java.awt.Color/WHITE (make-point 2 3) :rank 'bishop)
- ;(make-piece false java.awt.Color/WHITE (make-point 0 0)) ;rank will default to :zombie
+ ;(make-piece java.awt.Color/BLUE (make-point 1 5) :rank 'soldier)
+ ;(make-piece (java.awt.Image. bishop-icon.png) (make-point 2 3) :chess? true :rank 'bishop)
+ ;(make-piece java.awt.Color/WHITE (make-point 0 0)) ;rank will default to :zombie
 
 (defn move 
 "The function responsible for moving Pieces. Each piece knows how to move itself." 
-[p coords] 
-{:pre [(== 2 (count coords))]} ;safety comes first
-(. p update-position coords))  ;coords should be of the form [x, y]
-
+[pionia p coords] 
+{:pre [(== 2 (count coords))]}   ;safety comes first
+(do (. p update-position coords) ;coords should be of the form [x, y]
+    (build-board pionia)))
+      
+(def move-checker   (partial move all-checkers))   ;partially apply move with all-checkers locked in as 1st arg
+(def move-chessItem (partial move all-chessItems)) ;partially apply move with all-chessItems locked in as 1st arg
 
 (defn print-board [] 
 (for [letter "ABCDEFGH" ;strings are seqable
