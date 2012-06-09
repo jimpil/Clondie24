@@ -3,23 +3,6 @@
 
 )
 
-
-(def ^:const board-mappings-checkers 
-"A vector of vectors. Outer vector represents the 32 (serial) positions checkers can position themselves on. 
-Each inner vector represents the coordinates of that position on the 8x8 grid."
-[ ;;
-[1.0 0.0] [3.0 0.0] [5.0 0.0] [7.0 0.0] 
-[6.0 1.0] [4.0 1.0] [2.0 1.0] [0.0 1.0]
-[1.0 2.0] [3.0 2.0] [5.0 2.0] [7.0 2.0] 
-[6.0 3.0] [4.0 3.0] [2.0 3.0] [0.0 3.0]
-[1.0 4.0] [3.0 4.0] [5.0 4.0] [7.0 4.0]
-[6.0 5.0] [4.0 5.0] [2.0 5.0] [0.0 5.0]
-[1.0 6.0] [3.0 6.0] [5.0 6.0] [7.0 6.0]
-[6.0 7.0] [4.0 7.0] [2.0 7.0] [0.0 7.0]
-])
-
-(declare make-piece, make-checker, make-chessItem, translate-position) ;will need this fn 
-
 ;Helper macro for creting Points
 (defmacro make-point [p]
 `(java.awt.Point. (first ~p) (second ~p)))
@@ -48,72 +31,23 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
 (def chess-colors [(make-color 'BLACK)  
                    (make-color 'WHITE)])                       
  
-(declare all-chessItems) ;TODO                                                 
-            
-(defn starting-checkers
-"Will construct a set of initial pieces (12 for checkers or 16 for chess). opponent? specifies the side of the board where the pieces should be placed (true for north false for south). Optional arguments include board mappings and chess? (they default to checkers-mappings and false). If one is changed the other one should be changed as well.  " 
-[opponent? &{:keys [mappings]
-             :or {mappings board-mappings-checkers}}]                                   
-(if opponent? 
-   (for [p (range 0 12)]  
-        (make-checker (first checkers-colors)  
-        (make-point (translate-position p mappings)) :rank 'soldier))
-   (for [p (range 20 32)] 
-        (make-checker (second checkers-colors) 
-        (make-point (translate-position p mappings)) :rank 'soldier))
-))
+(declare all-chessItems) ;TODO 
 
+(def ^:const board-mappings-checkers 
+"A vector of vectors. Outer vector represents the 32 (serial) positions checkers can position themselves on. 
+Each inner vector represents the coordinates of that position on the 8x8 grid."
+[ ;;
+[1.0 0.0] [3.0 0.0] [5.0 0.0] [7.0 0.0] 
+[6.0 1.0] [4.0 1.0] [2.0 1.0] [0.0 1.0]
+[1.0 2.0] [3.0 2.0] [5.0 2.0] [7.0 2.0] 
+[6.0 3.0] [4.0 3.0] [2.0 3.0] [0.0 3.0]
+[1.0 4.0] [3.0 4.0] [5.0 4.0] [7.0 4.0]
+[6.0 5.0] [4.0 5.0] [2.0 5.0] [0.0 5.0]
+[1.0 6.0] [3.0 6.0] [5.0 6.0] [7.0 6.0]
+[6.0 7.0] [4.0 7.0] [2.0 7.0] [0.0 7.0]
+])
 
-(def all-checkers
-(concat (starting-checkers true) 
-        (starting-checkers false)))
-
-(defn starting-board-checkers 
-"Creates the initial board for checkers with correct starting positions."
-[] ;opponent pieces come first, then 8 nils and our pieces last (conj appends at tail)
-(flatten
-  (conj (starting-checkers false) 
-  (conj (repeat 8 nil) (starting-checkers true)))))
-
-(defn dead-piece? [p]
-((meta p) :dead))
-
-
-(defn build-board [chess?]
-(loop [nb (vec (if chess? (repeat 64 nil) (repeat 32 nil))) ;building a new board after each move
-      p (if chess? all-chessItems all-checkers)]
-(if (empty? p) (seq nb)
-(recur (assoc nb (.getListPosition (first p))    ;the piece's position
-(if (dead-piece? (first p))  nil ;if the piece is dead stick nil
-                (first p)))  ; else stick the piece in
-               (rest p)))))  ;carry on recursing
-                    
-
-(def chess-1d (range 64)) ;;the chess board as a list
-
-(defn to-2d [b] ; the checkers or chess board as 8 rows of 8 columns
-(map vec        ;apply 'reverse' to every second item in 1d-board
-(map #(%1 %2) (cycle [identity reverse]) (partition 8 b))))
-
-(def checkers-rel-values {:soldier 1 :prince 3}) ;only 2 types in checkers
-
-(def chess-ranks '(:queen :rook :knight :bishop :pawn :king)) ;all the different chess piece-types 
-(def rel-values  '(9 5 3 3 1 100))  ;relative values according to wikipedia
-(def chess-rel-values (zipmap chess-ranks rel-values)) ;=> {:king 100, :pawn 1, :bishop 3, :knight 3, :rook 5, :queen 9}
-
-(defn translate-position
-"Translates a position from 1d to 2d and vice-versa. 
-Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'." 
-([i mappings] {:post [(not (nil? %))]}   ;will translate from 1d to 2d
-(get mappings i)) 
-([x y mappings] {:post [(not (== % -1))]} ;will translate from 2d to 1d
-(.indexOf mappings (vector x y))
-)) 
-
-(defmacro in? ;handy function to test if some element exists in some collection 
- "Returns true if colle contains elm, false otherwise."
- [colle elm]  
-`(if (some #{~elm} ~colle) true false))  
+(declare make-piece, make-checker, make-chessItem, translate-position) ;will need this fn 
 
 (defprotocol Piece "The Piece abstraction."
  (update-position [this new-position])
@@ -158,6 +92,16 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
    (println rank "at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
 
 
+
+(defn translate-position
+"Translates a position from 1d to 2d and vice-versa. 
+Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'." 
+([i mappings] {:post [(not (nil? %))]}   ;will translate from 1d to 2d
+(get mappings i)) 
+([x y mappings] {:post [(not (== % -1))]} ;will translate from 2d to 1d
+(.indexOf mappings (vector x y))
+))
+
 (defn make-piece 
 "The central function for creating pieces. A piece is simply a record with 3 keys: colour, position [x,y] and rank (optional)."
  [chess? c p &{:keys [rank]
@@ -167,29 +111,87 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (with-meta (CheckersPiece. c p rank) {:dead false})))
 
 (def make-checker   (partial make-piece false))
-(def make-chessItem (partial make-piece true))
+(def make-chessItem (partial make-piece true))                                                 
+            
+(defn starting-checkers
+"Will construct a set of initial pieces (12). opponent? specifies the side of the board where the pieces should be placed (true for north false for south).   " 
+[opponent?]                                   
+(if opponent? 
+   (for [p (range 0 12)]  
+        (make-checker (first checkers-colors)  
+        (make-point   (translate-position p board-mappings-checkers)) :rank 'soldier))
+   (for [p (range 20 32)] 
+        (make-checker (second checkers-colors) 
+        (make-point   (translate-position p board-mappings-checkers)) :rank 'soldier))
+))
 
-;EXAMPLEs:
- ;(make-checker java.awt.Color/BLUE (make-point [1 5]) :rank 'soldier)
- ;(make-chessItem (java.awt.Image. bishop-icon.png) (make-point[2 3]) :chess? true :rank 'bishop)
- ;(make-checker java.awt.Color/WHITE (make-point [0 0])) ;rank will default to :zombie
+
+(def current-checkers 
+"This is the second piece of mutable state and is governed by an atom. It changes after every move."
+(atom (concat (starting-checkers true) 
+              (starting-checkers false))))
+
+(def starting-board-checkers 
+"Returns the initial board for checkers with correct starting positions."
+ ;opponent pieces come first, then 8 nils and our pieces last (conj appends at tail)
+(flatten
+  (conj (starting-checkers false) 
+  (conj (repeat 8 nil) (starting-checkers true)))))
+
+(defn dead-piece? [p]
+((meta p) :dead))
+
+
+(defn build-board [chess?]
+(loop [nb (vec (if chess? (repeat 64 nil) (repeat 32 nil))) ;building a new board after each move
+      p (if chess? @all-chessItems @current-checkers)]
+(if (empty? p) (seq nb)
+(recur (assoc nb (.getListPosition (first p))    ;the piece's position
+(if (dead-piece? (first p))  nil ;if the piece is dead stick nil
+                (first p)))  ; else stick the piece in
+               (rest p)))))  ;carry on recursing
+               
+ (defn clean [c] 
+ (filter #(not (nil? %)) c))              
+                    
+
+(def chess-1d (range 64)) ;;the chess board as a list
+
+(defn to-2d [b] ; the checkers or chess board as 8 rows of 8 columns
+(map vec        ;apply 'reverse' to every second item in 1d-board
+(map #(%1 %2) (cycle [identity reverse]) (partition 8 b))))
+
+(def checkers-rel-values {:soldier 1 :prince 3}) ;only 2 types in checkers
+
+(def chess-ranks '(:queen :rook :knight :bishop :pawn :king)) ;all the different chess piece-types 
+(def rel-values  '(9 5 3 3 1 100))  ;relative values according to wikipedia
+(def chess-rel-values (zipmap chess-ranks rel-values)) ;=> {:king 100, :pawn 1, :bishop 3, :knight 3, :rook 5, :queen 9}
+
+(defmacro in? ;handy function to test if some element exists in some collection 
+ "Returns true if colle contains elm, false otherwise."
+ [colle elm]  
+`(if (some #{~elm} ~colle) true false))  
+
 
 (defn move 
-"The function responsible for moving Pieces. Each piece knows how to move itself." 
+"The function responsible for moving Pieces. Each piece knows how to move itself. Returns the new board." 
 [chess? mappings p coords] 
 {:pre [(== 2 (count coords))]}   ;safety comes first
-(if (in? mappings (vec (map double coords)))
+(if (in? mappings (vec (map double coords))) ;check that position exists on the grid
 (do (. p update-position coords) ;coords should be of the form [x, y]
-    (build-board chess?)) 
+(reset! (if chess? all-chessItems current-checkers) 
+        (clean (build-board chess?)))) ;;replace the old board with the new
 (throw (Exception. (str coords " is NOT a valid position!")))))
 ;to be called only on the very first move of the game
-;([mappings p coords] (move all-checkers mappings p coords))
+;([mappings p coords] (move current-checkers mappings p coords))
 ;)
+;(reset! current-checkers (clean (move-checker (.die (first starting-board-checkers)) [2 3]))) 
 
-;partially apply move with all-checkers and checker-mappings locked in as 1st & 2nd args     
+;partially apply move with chess? and checker-mappings locked in as 1st & 2nd args     
 (def move-checker   (partial move false board-mappings-checkers))
-;partially apply move with all-chessItems and chess-mappings locked in as 1st & 2nd args
+;partially apply move with chess? and chess-mappings locked in as 1st & 2nd args
 (def move-chessItem (partial move true board-mappings-chess))  
+
 
 (defn print-board [] 
 (for [letter "ABCDEFGH" ;strings are seqable
@@ -197,7 +199,17 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (format "%c%d" letter number)))
 
 
+;EXAMPLEs:
+ ;(make-checker java.awt.Color/BLUE (make-point [1 5]) :rank 'soldier)
+ ;(make-chessItem (java.awt.Image. bishop-icon.png) (make-point[2 3]) :chess? true :rank 'bishop)
+ ;(make-checker java.awt.Color/WHITE (make-point [0 0])) ;rank will default to :zombie
+
+
+
+
 (defn -main ;lein generated
   "I don't do a whole lot."
   [& args]
   (println "Hello, Clondie24!"))
+  
+  
