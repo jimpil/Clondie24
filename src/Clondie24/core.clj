@@ -106,7 +106,8 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
  (die     [this] (vary-meta this assoc :dead true)) ;communicate death through meta-data 
  (promote [this] (make-checker color position :rank 'prince)) ; a checker is promoted to prince
  (getGridPosition [this] (vector (.getX position) (.getY position)))
- (getListPosition [this] (translate-position (.getX position) (.getY position) board-mappings-checkers))
+ (getListPosition [this] (translate-position  (first  (.getGridPosition this)) 
+                                              (second (.getGridPosition this)) board-mappings-checkers))
  (getPoint [this] position)
  (getMoves [this] nil) ;TODO
  Object
@@ -123,7 +124,8 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
  (die [this]     (vary-meta this assoc :dead true)) ;communicate death through meta-data 
  (promote [this] (make-chessItem image position :chess? true :rank 'queen)) ;a pawn is promoted to a queen
  (getGridPosition [this] (vector (.getX position) (.getY position)))
- (getListPosition [this] (translate-position (.getX position) (.getY position) board-mappings-chess))
+ (getListPosition [this] (translate-position (first  (.getGridPosition this)) 
+                                             (second (.getGridPosition this)) board-mappings-chess))
  (getPoint [this] position)
  (getMoves [this] nil) ;TODO 
  Object
@@ -135,9 +137,9 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
 (defn translate-position
 "Translates a position from 1d to 2d and vice-versa. 
 Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'." 
-( [i mappings] {:post [(not (nil? %))]}   ;will translate from 1d to 2d
+([i mappings] {:post [(not (nil? %))]}   ;will translate from 1d to 2d
       (get mappings i)) 
-([x y mappings] {:post [(not (== % -1))]} ;will translate from 2d to 1d
+([x y ^clojure.lang.PersistentVector mappings] {:post [(not (== % -1))]} ;will translate from 2d to 1d
 (.indexOf mappings (vector (double x)  (double y)))))
 
 (defn make-piece 
@@ -234,15 +236,18 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defmacro in? ;handy macro to test if some element exists in some collection 
  "Returns true if colle contains elm, false otherwise."
  [colle elm]  
-`(if (some #{~elm} ~colle) true false))  
+`(if (some #{~elm} ~colle) true false)) 
+
+(defmacro vector-of-doubles [v] 
+`(vec (map double ~v))) 
 
 
 (defn move 
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the new board." 
  ^clojure.lang.LazySeq 
 [^clojure.lang.Symbol game mappings p coords] 
-{:pre [(and (satisfies? Piece p) (== 2 (count coords)))]}  ;safety comes first
-(if (in? mappings (vec (map double coords))) ;check that position exists on the grid
+{:pre [(satisfies? Piece p)]}  ;safety comes first
+(if (in? mappings (vector-of-doubles coords)) ;check that position exists on the grid
 (do (. p update-position coords) ;coords should be of the form [x, y]
 (reset! (current-items game true) ;replace the board atom
         (clean (build-board game)))) ;;replace the old board with the new
@@ -258,11 +263,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                        ^clojure.lang.PersistentVector start-pos 
                        ^clojure.lang.PersistentVector end-pos]
  MoveCommand
- (execute [this] (move-chessItem p end-pos))
- (undo    [this] (move-chessItem p start-pos))
+ (execute [this] (move-chessItem p (.getEndPos this)))
+ (undo    [this] (move-chessItem p (.getStartPos this)))
  (getMovingPiece [this] p)
- (getStartPos [this] start-pos)
- (getEndPos   [this] end-pos)
+ (getStartPos [this] (vector-of-doubles start-pos))
+ (getEndPos   [this] (vector-of-doubles end-pos))
  Object
  (toString [this] 
    (println "Checkers-move originating from" (.getStartPos this) "to" (.getEndPos this))))
@@ -271,11 +276,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                           ^clojure.lang.PersistentVector start-pos 
                           ^clojure.lang.PersistentVector end-pos]
  MoveCommand
- (execute [this] (move-checker p end-pos))
- (undo    [this] (move-checker p start-pos))
+ (execute [this] (move-checker p (getEndPos this)))
+ (undo    [this] (move-checker p (getStartPos this)))
  (getMovingPiece [this] p)
- (getStartPos [this] start-pos)
- (getEndPos   [this] end-pos)
+ (getStartPos [this] (vector-of-doubles start-pos))
+ (getEndPos   [this] (vector-of-doubles end-pos))
  Object
  (toString [this] 
    (println "Chess-move originating from" (.getStartPos this) "to" (.getEndPos this))))
