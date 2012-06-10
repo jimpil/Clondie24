@@ -17,6 +17,20 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
 [6.0 7.0] [4.0 7.0] [2.0 7.0] [0.0 7.0]
 ])
 
+(def ^:const board-mappings-chess
+"A vector of vectors. Outer vector represents the 64 (serial) positions chess items can position themselves on. 
+Each inner vector represents the coordinates of that position on the 8x8 grid."
+[
+[0.0 0.0] [1.0 0.0] [2.0 0.0] [3.0 0.0] [4.0 0.0] [5.0 0.0] [6.0 0.0] [7.0 0.0]
+[7.0 1.0] [6.0 1.0] [5.0 1.0] [4.0 1.0] [3.0 1.0] [2.0 1.0] [1.0 1.0] [0.0 1.0]
+[0.0 2.0] [1.0 2.0] [2.0 2.0] [3.0 2.0] [4.0 2.0] [5.0 2.0] [6.0 2.0] [7.0 2.0]
+[7.0 3.0] [6.0 3.0] [5.0 3.0] [4.0 3.0] [3.0 3.0] [2.0 3.0] [1.0 3.0] [0.0 3.0]
+[0.0 4.0] [1.0 4.0] [2.0 4.0] [3.0 4.0] [4.0 4.0] [5.0 4.0] [6.0 4.0] [7.0 4.0]
+[7.0 5.0] [6.0 5.0] [5.0 5.0] [4.0 5.0] [3.0 5.0] [2.0 5.0] [1.0 5.0] [0.0 5.0]
+[0.0 6.0] [1.0 6.0] [2.0 6.0] [3.0 6.0] [4.0 6.0] [5.0 6.0] [6.0 6.0] [7.0 6.0]
+[7.0 7.0] [6.0 7.0] [5.0 7.0] [4.0 7.0] [3.0 7.0] [2.0 7.0] [1.0 7.0] [0.0 7.0]
+])
+
 (defmacro doeach 
 "Like doseq but in a map-like manner. Assumes f is side-effecty." 
  [f coll]
@@ -68,7 +82,7 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
  (getPoint [this])
  (die [this])
  (promote [this])
- (getMoves [this]) ;pretends there is only ONE piece on the board - will need filtering for validity later
+ (getMoves [this]) ;pretends there is only this piece on the board - will need filtering for validity later
  (toString [this])) 
  
  (defprotocol MoveCommand 
@@ -77,7 +91,8 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
  (undo    [this])
  (getMovingPiece [this])
  (getStartPos [this])
- (getEndPos   [this]))
+ (getEndPos   [this])
+ (asString [this]))
  
 
 
@@ -94,8 +109,9 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
  (getListPosition [this] (translate-position (.getX position) (.getY position) board-mappings-checkers))
  (getPoint [this] position)
  (getMoves [this] nil) ;TODO
+ Object
  (toString [this] 
-   (println rank "at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
+   (println "Checker (" rank ") at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
  
 (defrecord ChessPiece [^java.awt.Image image 
                        ^java.awt.Point position 
@@ -110,8 +126,9 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
  (getListPosition [this] (translate-position (.getX position) (.getY position) board-mappings-chess))
  (getPoint [this] position)
  (getMoves [this] nil) ;TODO 
+ Object
  (toString [this] 
-   (println rank "at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
+   (println "ChessItem (" rank ") at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
 
 
 
@@ -224,7 +241,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the new board." 
  ^clojure.lang.LazySeq 
 [^clojure.lang.Symbol game mappings p coords] 
-{:pre [(== 2 (count coords))]}   ;safety comes first
+{:pre [(and (satisfies? Piece p) (== 2 (count coords)))]}  ;safety comes first
 (if (in? mappings (vec (map double coords))) ;check that position exists on the grid
 (do (. p update-position coords) ;coords should be of the form [x, y]
 (reset! (current-items game true) ;replace the board atom
@@ -232,30 +249,36 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (throw (IllegalArgumentException. (str coords " is NOT a valid position according to the mappings provided!")))))
 
 
-;partially apply move with chess? and checker-mappings locked in as 1st & 2nd args     
+;partially apply move with game and checker-mappings locked in as 1st & 2nd args     
 (def move-checker   (partial move 'checkers board-mappings-checkers))
-;partially apply move with chess? and chess-mappings locked in as 1st & 2nd args
+;partially apply move with game and chess-mappings locked in as 1st & 2nd args
 (def move-chessItem (partial move 'chess board-mappings-chess))  
 
  (defrecord ChessMove [^ChessPiece p
                        ^clojure.lang.PersistentVector start-pos 
                        ^clojure.lang.PersistentVector end-pos]
-  MoveCommand
+ MoveCommand
  (execute [this] (move-chessItem p end-pos))
  (undo    [this] (move-chessItem p start-pos))
  (getMovingPiece [this] p)
  (getStartPos [this] start-pos)
- (getEndPos   [this] end-pos))
+ (getEndPos   [this] end-pos)
+ Object
+ (toString [this] 
+   (println "Checkers-move originating from" (.getStartPos this) "to" (.getEndPos this))))
  
  (defrecord CheckersMove [^CheckersPiece p
                           ^clojure.lang.PersistentVector start-pos 
                           ^clojure.lang.PersistentVector end-pos]
-  MoveCommand
+ MoveCommand
  (execute [this] (move-checker p end-pos))
  (undo    [this] (move-checker p start-pos))
  (getMovingPiece [this] p)
  (getStartPos [this] start-pos)
- (getEndPos   [this] end-pos))
+ (getEndPos   [this] end-pos)
+ Object
+ (toString [this] 
+   (println "Chess-move originating from" (.getStartPos this) "to" (.getEndPos this))))
  
 
 (defn printBoard 
