@@ -3,6 +3,11 @@
 
 )
 
+(defmacro doeach 
+"Like doseq but in a map-like manner. Assumes f is side-effecty." 
+ [f coll]
+`(doseq [x# ~coll] (~f x#)))
+
 ;Helper macro for creting Points
 (defmacro make-point [p]
 `(java.awt.Point. (first ~p) (second ~p)))
@@ -31,7 +36,7 @@
 (def chess-colors [(make-color 'BLACK)  
                    (make-color 'WHITE)])                       
  
-(declare all-chessItems) ;TODO 
+(declare current-chessItems) ;TODO 
 
 (def ^:const board-mappings-checkers 
 "A vector of vectors. Outer vector represents the 32 (serial) positions checkers can position themselves on. 
@@ -109,30 +114,28 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 ([i mappings] {:post [(not (nil? %))]}   ;will translate from 1d to 2d
 (get mappings i)) 
 ([x y mappings] {:post [(not (== % -1))]} ;will translate from 2d to 1d
-(.indexOf mappings (vector (double x)  (double y)))
-))
+(.indexOf mappings (vector (double x)  (double y)))))
 
 (defn make-piece 
 "The central function for creating pieces. A piece is simply a record with 3 keys: colour, position [x,y] and rank (optional)."
- [chess? c p &{:keys [rank]
+ [game c p &{:keys [rank]
                :or {rank 'zombie}}]
-(if chess?
-(with-meta (ChessPiece. c p rank)    {:dead false})  ;pieces are born 'alive'
-(with-meta (CheckersPiece. c p rank) {:dead false})))
+(condp = game
+    'chess    (with-meta (ChessPiece. c p rank)    {:dead false})  ;pieces are born 'alive'
+    'checkers (with-meta (CheckersPiece. c p rank) {:dead false})))               
+             
 
-(def make-checker   (partial make-piece false))
-(def make-chessItem (partial make-piece true))                                                 
+(def make-checker   (partial make-piece 'checkers)) 
+(def make-chessItem (partial make-piece 'chess))                                                 
             
 (defn starting-checkers
 "Will construct a set of initial pieces (12). opponent? specifies the side of the board where the pieces should be placed (true for north false for south).   " 
 [opponent?]                                   
-(if opponent? 
-   (for [p (range 0 12)]  
-        (make-checker (first checkers-colors)  
-        (make-point   (translate-position p board-mappings-checkers)) :rank 'soldier))
-   (for [p (range 20 32)] 
-        (make-checker (second checkers-colors) 
-        (make-point   (translate-position p board-mappings-checkers)) :rank 'soldier))
+(if opponent?  
+(map #(make-checker (first checkers-colors) 
+      (make-point (translate-position % board-mappings-checkers)) :rank 'soldier) (range 12))
+(map #(make-checker (first checkers-colors) 
+      (make-point (translate-position % board-mappings-checkers)) :rank 'soldier) (range 20 32))      
 ))
 
 
@@ -151,17 +154,35 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn dead-piece? [p]
 ((meta p) :dead))
 
+(defn empty-board 
+[game] 
+(condp = game 
+     'chess    (repeat 64 nil) 
+     'checkers (repeat 32 nil)))
+     
+(defn current-items 
+[game]
+(condp = game 
+      'chess    @current-chessItems 
+      'checkers @current-checkers))
+
+(defn current-atoms
+[game]
+(condp = game 
+      'chess    current-chessItems 
+      'checkers current-checkers))
+      
 
 (defn build-board 
 "Builds the appropriate board (chess or chekers). Will have nils at vacant positions."
-[chess?]
-(loop [nb (vec (if chess? (repeat 64 nil) (repeat 32 nil))) ;building a new board after each move
-      p (if chess? @all-chessItems @current-checkers)]
+[game]
+(loop [nb (vec (empty-board game)) ;building a new board after each move
+      p   (current-items game)]
 (if (empty? p) (seq nb)
-(recur (assoc nb (.getListPosition (first p))    ;the piece's position
-(if (dead-piece? (first p))  nil ;if the piece is dead stick nil
-                (first p)))  ; else stick the piece in
-               (rest p)))))  ;carry on recursing
+  (recur (assoc nb (.getListPosition (first p))    ;the piece's position
+     (if (dead-piece? (first p))  nil ;if the piece is dead stick nil
+                     (first p)))  ; else stick the piece in
+                     (rest p)))))  ;carry on recursing
                
  (defn clean [c] 
  (filter #(not (nil? %)) c))              
@@ -194,13 +215,13 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defn move 
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the new board." 
-[chess? mappings p coords] 
+[game mappings p coords] 
 {:pre [(== 2 (count coords))]}   ;safety comes first
 (if (in? mappings (vec (map double coords))) ;check that position exists on the grid
 (do (. p update-position coords) ;coords should be of the form [x, y]
-(reset! (if chess? all-chessItems current-checkers) 
-        (clean (build-board chess?)))) ;;replace the old board with the new
-(throw (Exception. (str coords " is NOT a valid position!")))))
+(reset! (current-atoms game)
+        (clean (build-board game)))) ;;replace the old board with the new
+(throw (IllegalArgumentException. (str coords " is NOT a valid position according to the mappings!")))))
 
 
 #_(defmacro move [chess? mappings p coords]
@@ -208,15 +229,15 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  {:pre [(== 2 (count ~coords))]}
  (if (in? ~mappings (vec (map double ~coords))) ;check that position exists on the grid
  (do (. ~p update-position ~coords) ;coords should be of the form [x, y]
- (reset! (if ~chess? all-chessItems current-checkers) 
+ (reset! (if ~chess? current-chessItems current-checkers) 
         (clean (build-board ~chess?)))) ;;replace the old board with the new
  (throw (Exception. (str coords " is NOT a valid position!"))))))
 
 
 ;partially apply move with chess? and checker-mappings locked in as 1st & 2nd args     
-(def move-checker   (partial move false board-mappings-checkers))
+(def move-checker   (partial move 'checkers board-mappings-checkers))
 ;partially apply move with chess? and chess-mappings locked in as 1st & 2nd args
-(def move-chessItem (partial move true board-mappings-chess))  
+(def move-chessItem (partial move 'chess board-mappings-chess))  
 
  (defrecord ChessMove [^ChessPiece p
                        ^clojure.lang.PersistentVector start-pos 
@@ -239,9 +260,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  (getEndPos   [this] end-pos))
  
 
-(defn print-board-checkers "Will print the detailed board with nils where vacant. Calls build-board without 'cleaning' it." 
-[chess?] 
-(build-board chess?))
+(defn printBoard 
+"Will print the detailed board with nils where vacant. Calls build-board without 'cleaning' it." 
+[game] 
+(build-board game))
 
 
 ;(for [letter "ABCDEFGH" ;strings are seqable
