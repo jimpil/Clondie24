@@ -83,16 +83,16 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
  (die [this])
  (promote [this])
  (getMoves [this]) ;pretends there is only this piece on the board - will need filtering for validity later
- (toString [this])) 
+) 
  
  (defprotocol MoveCommand 
- "The Command design pattern that allows us to undo commands."
+ "The Command design pattern in action (allows us to undo commands)."
  (execute [this])
  (undo    [this])
  (getMovingPiece [this])
  (getStartPos [this])
  (getEndPos   [this])
- (asString [this]))
+)
  
 
 
