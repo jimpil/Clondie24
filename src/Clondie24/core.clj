@@ -3,45 +3,10 @@
 
 )
 
-(defmacro doeach 
-"Like doseq but in a map-like manner. Assumes f is side-effecty." 
- [f coll]
-`(doseq [x# ~coll] (~f x#)))
-
-;Helper macro for creting Points
-(defmacro make-point [p]
-`(java.awt.Point. (first ~p) (second ~p)))
-
-;Helper macro for creting pre-defined Colours
-(defmacro make-color [predefined-name]
-`(.get (.getField (Class/forName "java.awt.Color") (str ~predefined-name)) nil))
-
-(def ^:const board-mappings-chess nil) ;TODO
-
-(def ^:dynamic black-direction -1)
-(def ^:dynamic white-direction 1)
-
-(def valid-checkers-positions    (range 32))
-(def invalid-checkers-positions  (repeat 32 -1))
-
-(def checkers-1d ;the checkers-board as a list. -1 represents invalid positions
-(interleave invalid-checkers-positions 
-            valid-checkers-positions))
-
-;RED is machine (north camp), YELLOW is human (south camp)            
-(def checkers-colors [(make-color 'RED)  
-                      (make-color 'YELLOW)]) 
-
-;BLACK is machine (north camp), WHITE is human (south camp)                       
-(def chess-colors [(make-color 'BLACK)  
-                   (make-color 'WHITE)])                       
- 
-(declare current-chessItems) ;TODO 
-
 (def ^:const board-mappings-checkers 
 "A vector of vectors. Outer vector represents the 32 (serial) positions checkers can position themselves on. 
 Each inner vector represents the coordinates of that position on the 8x8 grid."
-[ ;;
+[
 [1.0 0.0] [3.0 0.0] [5.0 0.0] [7.0 0.0] 
 [6.0 1.0] [4.0 1.0] [2.0 1.0] [0.0 1.0]
 [1.0 2.0] [3.0 2.0] [5.0 2.0] [7.0 2.0] 
@@ -52,7 +17,49 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
 [6.0 7.0] [4.0 7.0] [2.0 7.0] [0.0 7.0]
 ])
 
-(declare make-piece, make-checker, make-chessItem, translate-position) ;will need this fn 
+(defmacro doeach 
+"Like doseq but in a map-like manner. Assumes f is side-effecty." 
+ [f coll]
+`(doseq [x# ~coll] (~f x#)))
+
+;Helper macro for creting Points
+(defmacro make-point [p]
+`(java.awt.Point. (first ~p) (second ~p)))
+
+(defmacro make-image [path-to-image]
+`(java.awt.Image. path-to-image))
+
+;Helper macro for creting pre-defined Colours
+(defmacro make-color [predefined-name]
+`(.get (.getField (Class/forName "java.awt.Color") (str ~predefined-name)) nil))
+
+
+;RED is machine (north camp), YELLOW is human (south camp)            
+(def checkers-colors [(make-color 'RED)  
+                      (make-color 'YELLOW)]) 
+
+;BLACK is machine (north camp), WHITE is human (south camp)                       
+(def chess-colors [(make-color 'BLACK)  
+                   (make-color 'WHITE)]) 
+
+(def chess    {:players 2 :colors chess-colors    :board-size 64 :pieces 32 :mappings nil});TODO
+(def checkers {:players 2 :colors checkers-colors :board-size 32 :pieces 24 :mappings board-mappings-checkers})
+
+(def ^:const board-mappings-chess nil) ;TODO
+(def   current-chessItems nil) ;TODO
+
+(def ^:dynamic black-direction -1)
+(def ^:dynamic white-direction 1)
+
+(def valid-checkers-positions    (range 32))
+(def invalid-checkers-positions  (repeat 32 -1))
+
+(def checkers-1d ;the checkers-board as a list. -1 represents invalid positions
+(interleave invalid-checkers-positions 
+            valid-checkers-positions))
+                      
+
+(declare make-piece, make-checker, make-chessItem, translate-position, ) ;will need all this 
 
 (defprotocol Piece "The Piece abstraction."
  (update-position [this new-position])
@@ -111,8 +118,8 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
 (defn translate-position
 "Translates a position from 1d to 2d and vice-versa. 
 Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'." 
-([i mappings] {:post [(not (nil? %))]}   ;will translate from 1d to 2d
-(get mappings i)) 
+( [i mappings] {:post [(not (nil? %))]}   ;will translate from 1d to 2d
+      (get mappings i)) 
 ([x y mappings] {:post [(not (== % -1))]} ;will translate from 2d to 1d
 (.indexOf mappings (vector (double x)  (double y)))))
 
@@ -151,44 +158,44 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
   (conj (starting-checkers false) 
   (conj (repeat 8 nil) (starting-checkers true)))))
 
-(defn dead-piece? [p]
+(defn dead-piece? 
+^Boolean [p]
 ((meta p) :dead))
 
-(defn empty-board 
+(defmacro empty-board "This is a macro for performance reasons. I want to keep build-board as tight as possible." 
 [game] 
-(condp = game 
-     'chess    (repeat 64 nil) 
-     'checkers (repeat 32 nil)))
+`(condp = ~game 
+       (symbol "chess")    (repeat 64 nil) 
+       (symbol "checkers") (repeat 32 nil)
+))       
      
-(defn current-items 
-[game]
-(condp = game 
-      'chess    @current-chessItems 
-      'checkers @current-checkers))
-
-(defn current-atoms
-[game]
-(condp = game 
-      'chess    current-chessItems 
-      'checkers current-checkers))
+(defmacro current-items "This is a macro for performance reasons. I want to keep build-board as tight as possible." 
+[game atom?]
+`(condp = ~game 
+       (symbol "chess")    (if ~atom? current-chessItems @current-chessItems) 
+       (symbol "checkers") (if ~atom? current-checkers   @current-checkers)
+))
       
 
 (defn build-board 
-"Builds the appropriate board (chess or chekers). Will have nils at vacant positions."
+"Builds the appropriate board (chess or chekers). Will have nil at vacant positions."
+ ^clojure.lang.PersistentVector$ChunkedSeq 
 [game]
-(loop [nb (vec (empty-board game)) ;building a new board after each move
-      p   (current-items game)]
+(loop [nb (vec (empty-board game)) ;building a brand new board after each move
+       p  (current-items game false)]
 (if (empty? p) (seq nb)
   (recur (assoc nb (.getListPosition (first p))    ;the piece's position
      (if (dead-piece? (first p))  nil ;if the piece is dead stick nil
-                     (first p)))  ; else stick the piece in
-                     (rest p)))))  ;carry on recursing
+                      (first p)))  ; else stick the piece in
+                      (rest p)))))  ;carry on recursing
                
- (defn clean [c] 
- (filter #(not (nil? %)) c))              
+ (defmacro clean "Filter out nils from a collection." 
+  [c] 
+ `(filter #(not (nil? %)) ~c))              
  
- (defn vacant? "Checks if a position [x, y] is vacant on a the given board." 
- [m b pos]
+ (defn vacant? 
+ "Checks if a position [x, y] is vacant on the given board and mappings. Is a macro for performance reasons." 
+ ^Boolean [m b pos]
  (nil? 
   (nth b (translate-position (first pos) (second pos) m))))
   
@@ -215,23 +222,14 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defn move 
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the new board." 
-[game mappings p coords] 
+ ^clojure.lang.LazySeq 
+[^clojure.lang.Symbol game mappings p coords] 
 {:pre [(== 2 (count coords))]}   ;safety comes first
 (if (in? mappings (vec (map double coords))) ;check that position exists on the grid
 (do (. p update-position coords) ;coords should be of the form [x, y]
-(reset! (current-atoms game)
+(reset! (current-items game true) ;replace the board atom
         (clean (build-board game)))) ;;replace the old board with the new
-(throw (IllegalArgumentException. (str coords " is NOT a valid position according to the mappings!")))))
-
-
-#_(defmacro move [chess? mappings p coords]
-`(fn [chess? mappings p coords] 
- {:pre [(== 2 (count ~coords))]}
- (if (in? ~mappings (vec (map double ~coords))) ;check that position exists on the grid
- (do (. ~p update-position ~coords) ;coords should be of the form [x, y]
- (reset! (if ~chess? current-chessItems current-checkers) 
-        (clean (build-board ~chess?)))) ;;replace the old board with the new
- (throw (Exception. (str coords " is NOT a valid position!"))))))
+(throw (IllegalArgumentException. (str coords " is NOT a valid position according to the mappings provided!")))))
 
 
 ;partially apply move with chess? and checker-mappings locked in as 1st & 2nd args     
@@ -272,9 +270,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 
 ;EXAMPLEs:
- ;(make-checker    java.awt.Color/BLUE (make-point [1 5]) :rank 'soldier)
- ;(make-chessItem (java.awt.Image. bishop-icon.png) (make-point [2 3]) :rank 'bishop)
- ;(make-checker    java.awt.Color/WHITE (make-point [0 0]))   ;rank will default to 'zombie
+ ;(make-checker    (make-color 'BLUE)  (make-point [1 5]) :rank 'soldier)
+ ;(make-checker    (make-color 'WHITE) (make-point [0 0]))   ;rank will default to 'zombie
+ ;(make-chessItem  (make-image "bishop-icon.png") (make-point [2 3]) :rank 'bishop)
+
 
 
 
