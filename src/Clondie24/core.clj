@@ -101,8 +101,8 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
                            rank] 
  Piece 
  (update-position [this np] ;mutable state inside Point!
-   (. position setLocation  ;can accept ints or doubles
-     (first np) (second np))) ;np should be [x, y]
+   (.setLocation position   ;can accept ints or doubles
+    ^double (first np) ^double (second np))) ;np should be [x, y]
  (die     [this] (vary-meta this assoc :dead true)) ;communicate death through meta-data 
  (promote [this] (make-checker color position :rank 'prince)) ; a checker is promoted to prince
  (getGridPosition [this] (vector (.getX position) (.getY position)))
@@ -119,8 +119,8 @@ Each inner vector represents the coordinates of that position on the 8x8 grid."
                         rank]
  Piece 
  (update-position [this np] ;mutable state inside Point!
-   (. position setLocation  ;can accept ints or doubles
-     (first np) (second np))) ;np should be [x, y]
+   (.setLocation position   ;can accept ints or doubles
+    ^double (first np) ^double (second np))) ;np should be [x, y]
  (die [this]     (vary-meta this assoc :dead true)) ;communicate death through meta-data 
  (promote [this] (make-chessItem image position :chess? true :rank 'queen)) ;a pawn is promoted to a queen
  (getGridPosition [this] (vector (.getX position) (.getY position)))
