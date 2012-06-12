@@ -265,9 +265,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
           (conj (repeat 8 nil) (starting-checkers true))))
 ))
 
-(defn dead-piece? 
-^Boolean [p]
-((meta p) :dead))
+(defmacro dead-piece? [p]
+`((meta ~p) :dead))
 
 (defmacro empty-board 
 "This is a macro for performance reasons. I want to keep build-board fn as tight as possible." 
@@ -324,10 +323,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the new board." 
  ^clojure.lang.LazySeq 
 [game mappings  p coords] 
-;{:pre [(satisfies? Piece p)]}  ;safety comes first
+{:pre [(satisfies? Piece p)]}  ;safety comes first
 (if (in? mappings (vector-of-doubles coords)) ;check that position exists on the grid
 (do  (update-position p coords) ;coords should be of the form [x, y]
-(reset! (current-items game true) ;replace the board atom
+(reset! (current-items game true) ;replace the board atom - log new state
         (clean (build-board game)))) ;;replace the old board with the new
 (throw (IllegalArgumentException. (str coords " is NOT a valid position according to the mappings provided!")))))
 
