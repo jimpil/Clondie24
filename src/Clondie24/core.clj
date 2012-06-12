@@ -51,7 +51,7 @@
 "Returns a buffered-image from the specified file or nil if the file is not there.." 
 [path-to-image]
 `(try (javax.imageio.ImageIO/read (java.io.File. ~path-to-image))
- (catch java.io.IOException _# 
+ (catch java.io.IOException e# ;returning nil here is ok! 
   (println ~path-to-image "does not exist! Reverting to 'nil'..."))))
 
 ;Helper macro for creting pre-defined Colours
@@ -163,7 +163,7 @@
  Object
  (toString [this] 
    (println "ChessItem (" rank ") at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
-
+   
 
 (defn translate-position
 "Translates a position from 1d to 2d and vice-versa. 
@@ -186,11 +186,13 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defn make-piece 
 "The central function for creating pieces. A piece is simply a record with 3 keys: colour, position [x,y] and rank (optional)."
- [game c p &{:keys [rank]
+ [game c pos &{:keys [rank]
                :or {rank 'zombie}}]
 (condp = game
-    'chess    (with-meta (ChessPiece. c p rank (chess-rel-values (keyword rank))) {:dead false})  ;pieces are born 'alive'
-    'checkers (with-meta (CheckersPiece. c p rank (checkers-rel-values (keyword rank))) {:dead false})))               
+    'chess    (with-meta (ChessPiece. c pos rank (chess-rel-values (keyword rank))) 
+                         {:dead false})  ;pieces are born 'alive'
+    'checkers (with-meta (CheckersPiece. c pos rank (checkers-rel-values (keyword rank))) 
+                         {:dead false})))               
              
 
 (def make-checker   (partial make-piece 'checkers)) 
@@ -199,11 +201,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn starting-checkers
 "Will construct a set of initial checkers (12). opponent? specifies the side of the board where the pieces should be placed (true for north false for south).   " 
 [opponent?]
-(let [colours (checkers-colors 'RED 'YELLOW)]                                   
+(let [[red yellow] (checkers-colors 'RED 'YELLOW)]                                   
 (if opponent?  
-(map #(make-checker (first colours) 
+(map #(make-checker red
       (make-point (translate-position % (checkers :mappings))) :rank 'soldier) (range 12))
-(map #(make-checker (first colours) 
+(map #(make-checker yellow 
       (make-point (translate-position % (checkers :mappings))) :rank 'soldier) (range 20 32))      
 )))
 
@@ -274,10 +276,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (loop [nb (vec (empty-board game)) ;building a brand new board after each move
        p  (current-items game false)]
 (if (empty? p) (seq nb)
-  (recur (assoc nb (.getListPosition (first p))    ;the piece's position
-     (if (dead-piece? (first p))  nil ;if the piece is dead stick nil
-                      (first p)))  ; else stick the piece in
-         (rest p)))))  ;carry on recursing
+  (let [fp (first p)]
+    (recur (assoc nb (getListPosition fp)    ;the piece's position
+      (if (dead-piece? fp)  nil ;if the piece is dead stick nil
+                      fp))  ; else stick the piece in
+         (rest p))))))  ;carry on recursing
                
  (defmacro clean "Filter out nils from a collection." 
   [c] 
@@ -286,8 +289,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  (defn vacant? 
  "Checks if a position [x, y] is vacant on the given board and mappings. Is a macro for performance reasons." 
  ^Boolean [m b pos]
+ (let [[x y] pos]
  (nil? 
-  (nth b (translate-position (first pos) (second pos) m))))
+  (nth b (translate-position x y m)))))
   
  (def vacant-checker-tile?  (partial vacant? board-mappings-checkers))
  (def vacant-chess-tile?    (partial vacant? board-mappings-chess))                   
@@ -302,10 +306,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn move 
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the new board." 
  ^clojure.lang.LazySeq 
-[^clojure.lang.Symbol game mappings p coords] 
-{:pre [(satisfies? Piece p)]}  ;safety comes first
+[game mappings  p coords] 
+;{:pre [(satisfies? Piece p)]}  ;safety comes first
 (if (in? mappings (vector-of-doubles coords)) ;check that position exists on the grid
-(do  (.update-position p coords) ;coords should be of the form [x, y]
+(do  (update-position p coords) ;coords should be of the form [x, y]
 (reset! (current-items game true) ;replace the board atom
         (clean (build-board game)))) ;;replace the old board with the new
 (throw (IllegalArgumentException. (str coords " is NOT a valid position according to the mappings provided!")))))
