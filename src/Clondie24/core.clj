@@ -37,6 +37,17 @@
 (def ^:const rel-values  '(9 5 3 3 1 100))  ;relative values according to wikipedia
 (def ^:const chess-rel-values (zipmap chess-ranks rel-values)) ;=> {:king 100, :pawn 1, :bishop 3, :knight 3, :rook 5, :queen 9}
 
+(def board-history 
+"Log of the state of a game." 
+(atom []))
+
+(defn log-board 
+"The logging function for the board ref. Will conj every new board-state into a vector." 
+[dest k s old n] 
+(when (not= old n) 
+  (swap! dest conj n)))
+
+
 (defmacro doeach 
 "Like doseq but in a map-like manner. Assumes f is side-effecty." 
  [f coll]
@@ -225,14 +236,20 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 
 (def current-checkers 
-"This is list that keeps track of moving checkers.Is governed by an atom and it changes after every move."
+"This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'."
+(add-watch 
 (atom (concat (starting-checkers true) 
-              (starting-checkers false))))
+              (starting-checkers false)) 
+      :validator #(== 24 (count %))) 
+  :log (partial log-board board-history)))
               
 (def current-chessItems
-"This is list that keeps track of moving checkers.Is governed by an atom and it changes after every move."
+"This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'."
+(add-watch 
 (atom (concat (starting-chessItems true) 
-              (starting-chessItems false))))              
+              (starting-chessItems false)) 
+      :validator #(== 32 (count %))) 
+  :log (partial log-board board-history)))              
 
 (defn starting-board [game] 
 "Returns the initial board for a game with correct starting positions."
