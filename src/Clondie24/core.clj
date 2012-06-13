@@ -130,8 +130,8 @@
  
  (defprotocol MoveCommand 
  "The Command design pattern in action (allows us to undo commands)."
- (execute [this])
- (undo    [this])
+ (execute [this trying?])
+ (undo    [this trying?])
  (getMovingPiece [this])
  (getStartPos [this])
  (getEndPos   [this])
@@ -149,13 +149,13 @@
  (die     [this] (vary-meta this assoc :dead true)) ;communicate death through meta-data 
  (promote [this] (make-checker color position :rank 'prince)) ; a checker is promoted to prince
  (getGridPosition [this] (vector (.getX position) (.getY position)))
- (getListPosition [this] (translate-position  (first  (.getGridPosition this)) 
-                                              (second (.getGridPosition this)) (checkers :mappings)))
+ (getListPosition [this] (translate-position  (first  (getGridPosition this)) 
+                                              (second (getGridPosition this)) (checkers :mappings)))
  (getPoint [this] position)
  (getMoves [this] nil) ;TODO
  Object
  (toString [this] 
-   (println "Checker (" rank ") at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
+   (println "Checker (" rank ") at position:" (getListPosition this) " ->" (getGridPosition this))) )
  
 (defrecord ChessPiece [^java.awt.Image image 
                        ^java.awt.Point position 
@@ -165,15 +165,15 @@
    (.setLocation position   ;can accept ints or doubles
     ^double (first np) ^double (second np))) ;np should be [x, y]
  (die [this]     (vary-meta this assoc :dead true)) ;communicate death through meta-data 
- (promote [this] (make-chessItem image position :chess? true :rank 'queen)) ;a pawn is promoted to a queen
+ (promote [this] (make-chessItem image position :rank 'queen)) ;a pawn is promoted to a queen
  (getGridPosition [this] (vector (.getX position) (.getY position)))
- (getListPosition [this] (translate-position (first  (.getGridPosition this)) 
-                                             (second (.getGridPosition this)) (chess :mappings)))
+ (getListPosition [this] (translate-position (first  (getGridPosition this)) 
+                                             (second (getGridPosition this)) (chess :mappings)))
  (getPoint [this] position)
  (getMoves [this] nil) ;TODO 
  Object
  (toString [this] 
-   (println "ChessItem (" rank ") at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
+   (println "ChessItem (" rank ") at position:" (getListPosition this) " ->" (getGridPosition this))) )
    
 
 (defn translate-position
@@ -320,14 +320,15 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 
 (defn move 
-"The function responsible for moving Pieces. Each piece knows how to move itself. Returns the new board." 
+"The function responsible for moving Pieces. Each piece knows how to move itself. If trying? is true, there will be no histiry of the new state of the board. Returns the new board." 
  ^clojure.lang.LazySeq 
-[game mappings  p coords] 
+[game mappings  p coords trying?] 
 {:pre [(satisfies? Piece p)]}  ;safety comes first
 (if (in? mappings (vector-of-doubles coords)) ;check that position exists on the grid
 (do  (update-position p coords) ;coords should be of the form [x, y]
-(reset! (current-items game true) ;replace the board atom - log new state
-        (clean (build-board game)))) ;;replace the old board with the new
+(if trying? (clean (build-board game)) ;simply trying move - do not log anything - don't replace the baord-atom' 
+    (reset! (current-items game true) ;replace the board atom - log new state
+            (clean (build-board game))))) 
 (throw (IllegalArgumentException. (str coords " is NOT a valid position according to the mappings provided!")))))
 
 
@@ -340,8 +341,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                        ^clojure.lang.PersistentVector start-pos 
                        ^clojure.lang.PersistentVector end-pos]
  MoveCommand
- (execute [this] (move-chessItem p (.getEndPos this)))
- (undo    [this] (move-chessItem p (.getStartPos this)))
+ (execute [this try-it?] (move-chessItem p (getEndPos this)   try-it?))
+ (undo    [this try-it?] (move-chessItem p (getStartPos this) try-it?))
  (getMovingPiece [_] p)
  (getStartPos [_] (vector-of-doubles start-pos))
  (getEndPos   [_] (vector-of-doubles end-pos))
@@ -353,8 +354,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                           ^clojure.lang.PersistentVector start-pos 
                           ^clojure.lang.PersistentVector end-pos]
  MoveCommand
- (execute [this] (move-checker p (getEndPos this)))
- (undo    [this] (move-checker p (getStartPos this)))
+ (execute [this try-it?] (move-checker p (getEndPos this)   try-it?))
+ (undo    [this try-it?] (move-checker p (getStartPos this) try-it?))
  (getMovingPiece [_] p)
  (getStartPos [_] (vector-of-doubles start-pos))
  (getEndPos   [_] (vector-of-doubles end-pos))
