@@ -40,7 +40,7 @@
     [(>= (- x 1)   0) (>= (- y 2)   0) (== a (- x 1)) (== b (- y 2))] ;5th possibility
     [(>= (- x 2)   0) (>= (- y 1)   0) (== a (- x 2)) (== b (- y 1))] ;6th possibility
     [(>= (- x 2)   0) (< (+ y 1) ymax) (== a (- x 2)) (== b (+ y 1))] ;7th possibility
-    [(>= (- x 1)   0) (< (+ y 2) ymax) (== a (+ x 1)) (== b (+ y 2))] ;8th possibility
+    [(>= (- x 1)   0) (< (+ y 2) ymax) (== a (- x 1)) (== b (+ y 2))] ;8th possibility
   ) 
    (== q [a b])) ;return each solution in a vector [x, y]
 )))
