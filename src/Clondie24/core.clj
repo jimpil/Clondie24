@@ -184,11 +184,6 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 `(let [[x y] (getGridPosition p)]
  (java.awt.Point. x y)))
 
-(defmacro in? ;handy macro to test if some element exists in some collection 
- "Returns true if colle contains elm, false otherwise."
- [colle elm]  
-`(if (some #{~elm} ~colle) true false)) 
-
 (defmacro vector-of-doubles [v] 
 `(vec (map double ~v))) 
 
@@ -344,10 +339,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defn move 
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the resulting board without making any state changes. " 
- ^clojure.lang.PersistentVector
+ ^clojure.lang.PersistentVector 
 [game mappings p coords] 
 {:pre [(satisfies? Piece p)]}  ;safety comes first
-(if (in? mappings (vector-of-doubles coords)) ;check that position exists on the grid
+(if  (some #{(vector-of-doubles coords)} mappings) ;check that the position exists on the grid
 (let [newPiece (update-position p coords)] ;the piece that results from the move
 (populate-board game   ;replace dead-pieces with nils
 (-> (current-items game false) ;deref the appropriate board atom via this fn
