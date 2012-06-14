@@ -130,8 +130,9 @@
  
  (defprotocol MoveCommand 
  "The Command design pattern in action (allows us to undo commands)."
- (execute [this trying?])
- (undo    [this trying?])
+ (try-move [this])
+ (execute [this])
+ (undo    [this])
  (getMovingPiece [this])
  (getStartPos [this])
  (getEndPos   [this])
@@ -341,19 +342,17 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (map #(%1 %2) (cycle [identity reverse]) (partition 8 b))))
 
 
-
 (defn move 
-"The function responsible for moving Pieces. Each piece knows how to move itself. If trying? is true, there will be no histiry of the new state of the board. Returns the new board." 
+"The function responsible for moving Pieces. Each piece knows how to move itself. Returns the resulting board without making any state changes. " 
  ^clojure.lang.PersistentVector
-[game mappings p coords trying?] 
+[game mappings p coords] 
 {:pre [(satisfies? Piece p)]}  ;safety comes first
 (if (in? mappings (vector-of-doubles coords)) ;check that position exists on the grid
 (let [newPiece (update-position p coords)] ;the piece that results from the move
-(reset! (current-items game true) ;replace the board atom - log new state
 (populate-board game   ;replace dead-pieces with nils
-(-> (current-items game false) ;deref the board atom
+(-> (current-items game false) ;deref the appropriate board atom via this fn
     (assoc (getListPosition p) nil) 
-    (assoc (getListPosition newPiece) newPiece)))))
+    (assoc (getListPosition newPiece) newPiece))))
 (throw (IllegalArgumentException. (str coords " is NOT a valid position according to the mappings provided!")))))
 
 #_(do  (update-position p coords) ;coords should be of the form [x, y]
@@ -371,8 +370,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                        ^clojure.lang.PersistentVector start-pos 
                        ^clojure.lang.PersistentVector end-pos]
  MoveCommand
- (execute [this try-it?] (move-chessItem p (getEndPos this)   try-it?))
- (undo    [this try-it?] (move-chessItem p (getStartPos this) try-it?))
+ (try-move [this] (move-chessItem p (getEndPos this)))
+ (execute [this] (reset! current-chessItems (try-move this))) ;STATE CHANGE!
+ (undo    [this] (move-chessItem p (getStartPos this)))
  (getMovingPiece [_] p)
  (getStartPos [_] (vector-of-doubles start-pos))
  (getEndPos   [_] (vector-of-doubles end-pos))
@@ -384,8 +384,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                           ^clojure.lang.PersistentVector start-pos 
                           ^clojure.lang.PersistentVector end-pos]
  MoveCommand
- (execute [this try-it?] (move-checker p (getEndPos this)   try-it?))
- (undo    [this try-it?] (move-checker p (getStartPos this) try-it?))
+ (try-move [this] (move-checker p (getEndPos this)))
+ (execute [this]  (reset! current-checkers (try-move this)))  ;STATE CHANGE!
+ (undo    [this] (move-checker p (getStartPos this)))
  (getMovingPiece [_] p)
  (getStartPos [_] (vector-of-doubles start-pos))
  (getEndPos   [_] (vector-of-doubles end-pos))
