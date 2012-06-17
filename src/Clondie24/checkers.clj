@@ -1,6 +1,7 @@
 (ns Clondie24.checkers
      (:require [Clondie24.util :as ut] 
-               [Clondie24.core :as core])
+               [Clondie24.core :as core]
+               [Clondie24.rules :as rul])
 )
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
@@ -20,11 +21,11 @@
 ])
 
 
-
 ;RED is machine (north camp), YELLOW is human (south camp)            
 (defn checkers-colors [c1 c2] 
 (vec (map ut/make-color (list c1 c2))))
 
+(declare make-checker, details)
 
 (defn starting-checkers
 "Will construct a set of initial checkers (12). opponent? specifies the side of the board where the pieces should be placed (true for north false for south).   " 
@@ -32,11 +33,18 @@
 (let [[red yellow] (checkers-colors 'RED 'YELLOW)]                                   
 (if opponent?  
 (map #(make-checker red
-      (translate-position % (get (details) :mappings)) :rank 'soldier) (range 12))
+      (core/translate-position % board-mappings-checkers) :rank 'soldier) (range 12))
 (map #(make-checker yellow 
-      (translate-position % (get (details) :mappings)) :rank 'soldier) (range 20 32))      
-)))
+      (core/translate-position % board-mappings-checkers) :rank 'soldier) (range 20 32))      
+)))               
 
+(def current-checkers 
+"This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
+(add-watch 
+(atom nil #_(vec (core/starting-board (details)))) 
+      ;:validator #(== 24 (count %)) 
+  :log (partial core/log-board core/board-history)))
+  
 (defn details "Returns a map that describes the game of checkers."
 ^clojure.lang.PersistentArrayMap []
               {:name 'checkers
@@ -47,54 +55,47 @@
                :total-pieces 24
                :rel-values {:soldier 1 :prince 3}
                :board-atom  current-checkers
-               :record-name "CheckersPiece"
+               :record-name "Clondie24.checkers.CheckersPiece"
                :mappings board-mappings-checkers
                :north-player-start  (starting-checkers true)
                :south-player-start  (starting-checkers false)})
-               
-               
-(def current-checkers 
-"This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'."
-(add-watch 
-(atom (vec (core/starting-board (details))) ) 
-      ;:validator #(== 24 (count %)) 
-  :log (partial core/log-board core/board-history)))  
-  
-  
-;partially apply move with game and checker-mappings locked in as 1st & 2nd args     
+
+;partially apply move with game locked in as 1st
 (def move-checker   (partial core/move  (details)))
-(def make-checker   (partial core/make-piece (details))) 
-(def vacant-checker-tile?  (partial ut/vacant? (get (details) mappings))
+(def make-checker   (partial core/make-piece (details)))                
+(def vacant-checker-tile?  (partial core/vacant? board-mappings-checkers))  
+                
 
 (defrecord CheckersPiece [^java.awt.Color color 
                           ^clojure.lang.PersistentVector position 
                            rank ^Integer value] 
-Piece 
+ core/Piece 
  (update-position [this np]  (make-checker color np :rank rank))
  (die     [this] (vary-meta this assoc :dead true)) ;communicate death through meta-data 
  (promote [this] (make-checker color position :rank 'prince)) ; a checker is promoted to prince
  (getGridPosition [this] position)
- (getListPosition [this] (translate-position  (first  position) 
-                                              (second position) (get (checkers) :mappings)))
- (getPoint [this] (make-point position))
+ (getListPosition [this] (core/translate-position  (first  position) 
+                                                   (second position) board-mappings-checkers))
+ (getPoint [this] (ut/make-point position))
+ (getRank [this] rank)
  (getMoves [this] nil) ;TODO
  Object
  (toString [this] 
-   (println "Checker (" rank ") at position:" (getListPosition this) " ->" (getGridPosition this))) )
+   (println "Checker (" rank ") at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
  
-(defrecord CheckersMove [^CheckersPiece p
+(defrecord CheckersMove [ ^CheckersPiece p
                           ^clojure.lang.PersistentVector start-pos 
                           ^clojure.lang.PersistentVector end-pos]
-MoveCommand
- (try-move [this] (move-checker p (getEndPos this)))
- (execute [this]  (reset! (get (details) :board-atom) (try-move this)))  ;STATE CHANGE!
- (undo    [this]  (move-checker p (getStartPos this)))
+ core/MoveCommand
+ (try-move [this] (move-checker p (core/getEndPos this)))
+ (execute [this]  (reset! (get (details) :board-atom) (core/try-move this)))  ;STATE CHANGE!
+ (undo    [this]  (move-checker p (core/getStartPos this)))
  (getMovingPiece [_] p)
  (getStartPos [_] (ut/vector-of-doubles start-pos))
  (getEndPos   [_] (ut/vector-of-doubles end-pos))
  Object
  (toString [this] 
-   (println "Chess-move originating from" (getStartPos this) "to" (getEndPos this)))) 
+   (println "Chess-move originating from" (core/getStartPos this) "to" (core/getEndPos this)))) 
    
 (defn to-2d [b] ; the checkers or chess board as 8 rows of 8 columns
 (map vec        ;apply 'reverse' to every second item in 1d-board
