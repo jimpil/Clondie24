@@ -9,7 +9,15 @@ This is an attempt to re-create Blondie24 [1], the computer program that learnt 
 This is work in progress... I wouldn't even call it version 0.0.1!
 
 
+#Update [17/6/2012]
+--------------------
 
+- It's turning out to be more like a framework for writing board games rather than a recreation of Blondie24.
+- The core engine is ready. The 'world' is fully immutable. 
+- No need to keep a stack of moves since I'm logging every new state of the board.
+- Chess and Checkers namespaces are ready (records that satisfy protocols from core).
+- How each piece should move will be implented in core.logic in rules.clj (knight-moves is ready).
+- As soon as I've got the rules of each piece in core.logic I can start putting everything together...
 
 
 
