@@ -1,4 +1,5 @@
-(ns Clondie24.core)
+(ns Clondie24.core
+   (:require [Clondie24.util :as ut]))
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------   
 
@@ -17,6 +18,7 @@
  (getGridPosition [this])
  (getListPosition [this])
  (getPoint [this])
+ (getRank [this])
  (die [this])
  (promote [this])
  (getMoves [this]) ;pretends there is only this piece on the board - will need filtering for validity later
@@ -51,19 +53,18 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  [game c pos &{:keys [rank]
                :or {rank 'zombie}}]
 (with-meta 
-   ((record-factory (game :record-name)) c pos rank 
+   ((ut/record-factory (game :record-name)) c pos rank 
    (get (game :rel-values) (keyword rank))) 
 {:dead false}))   ;pieces are born 'alive'              
              
                                
 (defn starting-board [game] 
 "Returns the initial board for a game with pieces on correct starting positions."
- ;opponent pieces come first, then 8 nils and our pieces last (conj appends at tail)
 (let [p1 (game :north-player-start)
       p2 (game :south-player-start)
       vacant (- (game :board-size) (game :total-pieces))]
-(flatten
-  (conj p2 (conj (repeat vacant nil) p1)))))
+(vec (flatten
+     (conj p2 (conj (repeat vacant nil) p1))))))
   
  
 (defn dead-piece? [p]
@@ -77,7 +78,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defn populate-board 
 "Builds the appropriate board (chess or chekers). Will have nil at vacant positions. Really ugly fn but it does everything in 1 pass!"
- ^clojure.lang.PersistentVector
+ ;^clojure.lang.PersistentVector
 [game-map board]
 (loop [nb (vec (empty-board game-map)) ;building a brand new board after each move
        p  board]
@@ -86,7 +87,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
     (recur 
     (if (nil? fp) nb ;if encounter nil just carry on recursing with the current board
        (assoc nb  ;else
-          (getListPosition fp)    ;the piece's position
+          (getListPosition fp)    ;the piece's index
         (if (dead-piece? fp)   nil ;if the piece is dead stick nil
                          fp)))  ; else stick the piece in
          (rest p) )))))  ;carry on recursing
@@ -94,10 +95,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defn move 
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the resulting board without making any state changes. " 
- ^clojure.lang.PersistentVector 
+ ;^clojure.lang.PersistentVector 
 [game-map p coords] 
-{:pre [(satisfies? Piece p)]}  ;safety comes first
-(if  (some #{(vector-of-doubles coords)} (game-map :mappings)) ;check that the position exists on the grid
+{:pre [(satisfies? Clondie24.core/Piece p)]}  ;safety comes first
+(if  (some #{(ut/vector-of-doubles coords)} (game-map :mappings)) ;check that the position exists on the grid
 (let [newPiece (update-position p coords)] ;the piece that results from the move
 (populate-board game-map   ;replace dead-pieces with nils
 (-> @(game-map :board-atom)    ;deref the appropriate board atom 
@@ -116,6 +117,20 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  ;(make-checker    (make-color 'WHITE) [0 0])   ;rank will default to 'zombie
  ;(make-chessItem  (make-image "bishop-icon.png") [2 3] :rank 'bishop)
 
+(defn vacant? 
+ "Checks if a position [x, y] is vacant on the given board and mappings." 
+  [m b pos]
+ (let [[x y] pos]
+ (nil? 
+  (nth b (translate-position x y m))))) 
+
+(defmacro bury-dead "Will filter out dead-pieces from a collection"
+  [c]
+ `(filter (complement dead-piece?) ~c)) 
+ 
+(defn clean [c]
+ (filter #(and (not (nil? %)) 
+               (not (dead-piece? %)))  c))                
 
 (defn -main ;lein generated
   "I don't do a whole lot."
