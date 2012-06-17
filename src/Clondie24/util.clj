@@ -44,21 +44,12 @@
       (str predefined-name)) nil)) 
       
 (defn piece->point [p] ;needs to be in the gui namespace
- (let [[x y] (getGridPosition p)]
+ (let [[x y] (.getGridPosition  p)]
  (java.awt.Point. x y))) 
  
 (defmacro no-nils "Filter out nils from a collection." 
   [c] 
- `(filter (complement nil?) ~c)) 
- 
-(defmacro bury-dead "Will filter out dead-pieces from a collection"
-  [c]
- `(filter (complement dead-piece?) ~c)) 
- 
-(defn clean 
- ^clojure.lang.PersistentVector [c]
- (filter #(and (not (nil? %)) 
-               (not (dead-piece? %)))  c))  
+ `(filter (complement nil?) ~c))  
  
 (defmacro print-board 
 "Will print the detailed board with nils where vacant. Calls build-board without 'cleaning' it." 
@@ -70,10 +61,5 @@
 `(inspect-table ;(get (~game) :characteristics)  
          (deref (get (~game) :board-atom))))  
          
-(defn vacant? 
- "Checks if a position [x, y] is vacant on the given board and mappings." 
- ^Boolean [m b pos]
- (let [[x y] pos]
- (nil? 
-  (nth b (translate-position x y m)))))          
+         
     
