@@ -81,7 +81,7 @@
  (getMoves [this] nil) ;TODO
  Object
  (toString [this] 
-   (println "Checker (" rank ") at position:" (.getListPosition this) " ->" (.getGridPosition this))) )
+   (println "Checker (" rank ") at position:" (core/getListPosition this) " ->" (core/getGridPosition this))) )
  
 (defrecord CheckersMove [ ^CheckersPiece p
                           ^clojure.lang.PersistentVector start-pos 
