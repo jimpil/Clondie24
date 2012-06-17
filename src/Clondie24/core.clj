@@ -49,7 +49,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
                     
 (defn make-piece 
-"The central function for creating pieces. A piece is simply a record with 3 keys: colour, position [x,y] and rank (optional)."
+"The central function for creating pieces. A piece is simply a record with 4 keys."
  [game c pos &{:keys [rank]
                :or {rank 'zombie}}]
 (with-meta 
@@ -71,39 +71,26 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 ((meta p) :dead))
 
 (defn empty-board 
-"Returns an empty board - all nils." 
-[game-map] 
-(repeat (game-map :board-size) nil))
-      
+"Returns an empty board for the game provided - all nils." 
+[game] 
+(repeat (game :board-size) nil))
 
 (defn populate-board 
-"Builds the appropriate board (chess or chekers). Will have nil at vacant positions. Really ugly fn but it does everything in 1 pass!"
- ;^clojure.lang.PersistentVector
-[game-map board]
-(loop [nb (vec (empty-board game-map)) ;building a brand new board after each move
-       p  board]
-(if (empty? p) nb
-  (let [fp (first p)]
-    (recur 
-    (if (nil? fp) nb ;if encounter nil just carry on recursing with the current board
-       (assoc nb  ;else
-          (getListPosition fp)    ;the piece's index
-        (if (dead-piece? fp)   nil ;if the piece is dead stick nil
-                         fp)))  ; else stick the piece in
-         (rest p) )))))  ;carry on recursing
+"Builds a new board with nils instead of dead pieces." 
+[board]     
+(into [] (map #(if (dead-piece? %) nil %) board)))
                
 
 (defn move 
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the resulting board without making any state changes. " 
- ;^clojure.lang.PersistentVector 
 [game-map p coords] 
 {:pre [(satisfies? Clondie24.core/Piece p)]}  ;safety comes first
 (if  (some #{(ut/vector-of-doubles coords)} (game-map :mappings)) ;check that the position exists on the grid
-(let [newPiece (update-position p coords)] ;the piece that results from the move
-(populate-board game-map   ;replace dead-pieces with nils
-(-> @(game-map :board-atom)    ;deref the appropriate board atom 
-    (assoc (getListPosition p) nil) 
-    (assoc (getListPosition newPiece) newPiece))))
+(let [newPiece (update-position p coords)] ;the new piece as a result of moving
+(populate-board              ;replace dead-pieces with nils
+(-> @(game-map :board-atom)  ;deref the appropriate board atom 
+     (assoc (getListPosition p) nil) 
+     (assoc (getListPosition newPiece) newPiece))))
 (throw (IllegalArgumentException. (str coords " is NOT a valid position according to the mappings provided!")))))
 
 
@@ -124,7 +111,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  (nil? 
   (nth b (translate-position x y m))))) 
 
-(defmacro bury-dead "Will filter out dead-pieces from a collection"
+(defmacro bury-dead 
+"Will filter out dead-pieces from a collection"
   [c]
  `(filter (complement dead-piece?) ~c)) 
  
