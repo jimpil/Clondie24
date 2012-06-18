@@ -1,6 +1,6 @@
 (ns Clondie24.util
       (:use [clojure.pprint :only (pprint, print-table)]
-            [clojure.inspector :only (inspect-table)]))
+            #_[clojure.inspector :only (inspect-table)]))
             
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
@@ -57,9 +57,41 @@
 `(print-table (get (~game) :characteristics);the columns
        (deref (get (~game) :board-atom))))  ;the rows
        
+
+         
+(defn old-table-model 
+"Modified table-model that does not give up when first element is nil." 
+ [data]
+  (let [row1 (some #(when-not (nil? %) %) data) ;only this line is different from clojure.inspector/old-table-model  
+    colcnt (count row1)
+    cnt (count data)
+    vals (if (map? row1) vals identity)]
+    (proxy [javax.swing.table.TableModel] []
+      (addTableModelListener [tableModelListener])
+      (getColumnClass [columnIndex] Object)
+      (getColumnCount [] colcnt)
+      (getColumnName [columnIndex]
+    (if (map? row1)
+      (name (nth (keys row1) columnIndex))
+      (str columnIndex)))
+      (getRowCount [] cnt)
+      (getValueAt [rowIndex columnIndex]
+    (nth (vals (nth data rowIndex)) columnIndex))
+      (isCellEditable [rowIndex columnIndex] false)
+      (removeTableModelListener [tableModelListener]))))          
+         
+(defn inspect-table 
+  "creates a graphical inspector on the supplied regular
+  data, which must be a sequential data structure of data structures
+  of equal length."
+  [data]
+  (doto (javax.swing.JFrame. "Clondie24 Board")
+    (.add (javax.swing.JScrollPane. 
+          (javax.swing.JTable. (old-table-model data))))
+    (.setSize 500 600)
+    (.setVisible true)))
+    
 (defmacro inspect-board [game] ;fails if the first element is nil
 `(inspect-table ;(get (~game) :characteristics)  
-         (deref (get (~game) :board-atom))))  
-         
-         
+ (deref (get (~game) :board-atom))))          
     
