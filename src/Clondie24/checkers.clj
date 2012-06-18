@@ -77,20 +77,18 @@
  (getListPosition [this] (core/translate-position  (first  position) 
                                                    (second position) board-mappings-checkers))
  (getPoint [this] (ut/make-point position))
- (getRank [this] rank)
  (getMoves [this] nil) ;TODO
  Object
  (toString [this] 
    (println "Checker (" rank ") at position:" (core/getListPosition this) " ->" (core/getGridPosition this))) )
  
-(defrecord CheckersMove [ ^CheckersPiece p
+(defrecord CheckersMove [ ^CheckersPiece piece
                           ^clojure.lang.PersistentVector start-pos 
                           ^clojure.lang.PersistentVector end-pos]
  core/MoveCommand
  (try-move [this] (move-checker p (core/getEndPos this)))
  (execute [this]  (reset! (get (details) :board-atom) (core/try-move this)))  ;STATE CHANGE!
  (undo    [this]  (move-checker p (core/getStartPos this)))
- (getMovingPiece [_] p)
  (getStartPos [_] (ut/vector-of-doubles start-pos))
  (getEndPos   [_] (ut/vector-of-doubles end-pos))
  Object
