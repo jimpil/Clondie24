@@ -18,7 +18,6 @@
  (getGridPosition [this])
  (getListPosition [this])
  (getPoint [this])
- (getRank [this])
  (die [this])
  (promote [this])
  (getMoves [this]) ;pretends there is only this piece on the board - will need filtering for validity later
@@ -29,7 +28,6 @@
  (try-move [this])
  (execute [this])
  (undo    [this])
- (getMovingPiece [this])
  (getStartPos [this])
  (getEndPos   [this])
 )
@@ -41,11 +39,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 ([i mappings] ;{:post [(not (nil? %))]}   
 (let [grid-loc (get mappings i)] ;will translate from 1d to 2d
 (if-not (nil? grid-loc) grid-loc 
-(throw (IllegalStateException. (str "NOT a valid location:" i))))))
+(throw (IllegalStateException. (str "NOT a valid list-location: " i))))))
 ([x y ^clojure.lang.PersistentVector mappings] ;{:post [(not (== % -1))]} 
 (let [list-loc (.indexOf mappings (vector (double x)  (double y)))] ;will translate from 2d to 1d
 (if-not (== list-loc -1) list-loc 
-(throw (IllegalStateException. (str "NOT a valid location:" x "," y)))))))
+(throw (IllegalStateException. (str "NOT a valid grid-location: [" x "," y "]")))))))
 
                     
 (defn make-piece 
