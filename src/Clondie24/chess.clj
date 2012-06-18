@@ -45,7 +45,7 @@
 (declare make-chessItem, details) ;;will need these
 
 (defn starting-chessItems
-"Will construct a set of initial checkers (12). opponent? specifies the side of the board where the pieces should be placed (true for north false for south)."
+"Will construct a set of initial chess items (16). opponent? specifies the side of the board where the pieces should be placed (true for north false for south)."
 [opponent?]
 (if opponent?  
 (map #(make-chessItem (second (chess-images (keyword %2))) 
@@ -54,19 +54,19 @@
       (core/translate-position % board-mappings-chess) :rank %2) (range 48 64) (reverse chessPos->rank))      
 ))
 
-(def chess-moves {:pawn     nil
-                  :rook     nil
-                  :bishop   nil
+(def chess-moves {:pawn     nil ;TODO
+                  :rook     nil ;TODO
+                  :bishop   nil ;TODO
                   :knight   #(rul/knight-moves %1 %2)
-                  :queen    nil 
-                  :king     nil})
+                  :queen    nil   ;TODO
+                  :king     nil}) ;TODO
                   
 (defn rank->moves 
-"Returns all the legal moves of p depending on rank of p." 
+"Returns all legal moves of p depending on rank of p." 
 [p] 
 (let [gpos (core/getGridPosition p)]
-((get chess-moves (keyword (core/getRank p))) ;will return a fn
-  (first gpos) (second gpos))))
+((chess-moves (keyword (:rank p))) ;will return a fn
+ (first gpos) (second gpos))))
 
                       
 (def current-chessItems
@@ -76,22 +76,21 @@
       ;:validator #(== 32 (count %))   
   :log (partial core/log-board core/board-history)))                       
                       
-(defn details "Returns a map that describes the game of chess."
-^clojure.lang.PersistentArrayMap []
+(defn details 
+"Returns a map that describes the game of chess." []
               {:name 'chess
                :players 2 
                :images chess-images
                :characteristics [:image :position :rank :value]      
                :board-size 64 
                :total-pieces 32
-
                :rel-values (zipmap '(:queen :rook :knight :bishop :pawn :king) 
                                    '(  9      5     3       3       1     100))
                :board-atom current-chessItems
                :record-name "Clondie24.chess.ChessPiece" 
                :mappings board-mappings-chess
-               :north-player-start  (starting-chessItems true)
-               :south-player-start  (starting-chessItems false)})
+               :north-player-start  (starting-chessItems true)    ;opponent
+               :south-player-start  (starting-chessItems false)}) ;human
                
   
 ;partially apply move with game and chess-mappings locked in as 1st & 2nd args
@@ -110,7 +109,6 @@
  (getListPosition [this] (core/translate-position (first  position) 
                                                   (second position) (get (details) :mappings)))
  (getPoint [this] (ut/make-point position))
- (getRank [this] rank)
  (getMoves [this] (rank->moves this)) ;returns a list of points [x y]
  Object
  (toString [this] 
@@ -123,7 +121,6 @@
  (try-move [this] (move-chessItem p (core/getEndPos this)))
  (execute [this]  (reset! (get (details) :board-atom) (core/try-move this))) ;STATE CHANGE!
  (undo    [this]  (move-chessItem p (core/getStartPos this)))
- (getMovingPiece [_] p)
  (getStartPos [_] (ut/vector-of-doubles start-pos))
  (getEndPos   [_] (ut/vector-of-doubles end-pos))
  Object
