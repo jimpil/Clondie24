@@ -76,7 +76,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn populate-board 
 "Builds a new board with nils instead of dead pieces." 
 [board]     
-(into [] (map #(if (dead-piece? %) nil %) board)))
+(into [] (map #(if (or (nil? %) 
+                       (dead-piece? %)) nil %) board)))
                
 
 (defn move 
