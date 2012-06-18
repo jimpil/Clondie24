@@ -82,7 +82,7 @@
  (toString [this] 
    (println "Checker (" rank ") at position:" (core/getListPosition this) " ->" (core/getGridPosition this))) )
  
-(defrecord CheckersMove [ ^CheckersPiece piece
+(defrecord CheckersMove [ ^CheckersPiece p
                           ^clojure.lang.PersistentVector start-pos 
                           ^clojure.lang.PersistentVector end-pos]
  core/MoveCommand
