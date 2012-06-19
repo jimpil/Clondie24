@@ -66,8 +66,8 @@
 (defmacro print-board 
 "Will print the detailed board with nils where vacant. Calls build-board without 'cleaning' it." 
 [game] 
-`(print-table (get (~game) :characteristics);the columns
-       (deref (get (~game) :board-atom))))  ;the rows
+`(print-table (:characteristics (~game));the columns
+       (deref (:board-atom (~game)))))  ;the rows
        
 
          
