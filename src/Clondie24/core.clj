@@ -47,22 +47,22 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 "The central function for creating pieces. A piece is simply a record with 4 keys."
  [game c pos &{:keys [rank]
                :or {rank 'zombie}}]
- ((ut/record-factory-aux (game :record-name)) c 
+ ((ut/record-factory-aux (:record-name game)) c 
   (ut/vector-of-doubles pos) rank 
-  (get (game :rel-values) (keyword rank)) {:dead false} ;pieces are born 'alive'             
-                                           nil))        ;no field-extension map                          
+  (get (game :rel-values) (keyword rank)) {:alive true} ;pieces are born 'alive'             
+                                           nil))        ;no extra fields                          
                                
 (defn starting-board [game] 
 "Returns the initial board for a game with pieces on correct starting positions."
-(let [p1 (game :north-player-start)
-      p2 (game :south-player-start)
-      vacant (- (game :board-size) (game :total-pieces))]
+(let [p1 (:north-player-start game)
+      p2 (:south-player-start game)
+      vacant (- (:board-size game) (:total-pieces game))]
 (vec (flatten
      (conj p2 (conj (repeat vacant nil) p1))))))
   
  
-(defn dead-piece? [p]
-((meta p) :dead))
+(defn alive? [p]
+(:alive (meta p)))
 
 (defn empty-board 
 "Returns an empty board for the game provided - all nils." 
@@ -72,15 +72,14 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn populate-board 
 "Builds a new board with nils where dead pieces were." 
 [board]     
-(into [] (map #(if (or (nil? %) 
-                       (dead-piece? %)) nil %) board)))
+(into [] (map #(if (alive? %) % nil) board)))
                
 
 (defn move 
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the resulting board without making any state changes. " 
 [game-map p coords] 
-{:pre [(satisfies? Clondie24.core/Piece p)]}  ;safety comes first
-(if  (some #{(ut/vector-of-doubles coords)} (game-map :mappings)) ;check that the position exists on the grid
+{:pre [(satisfies? Piece p)]}  ;safety comes first
+(if  (some #{(ut/vector-of-doubles coords)} (:mappings game-map)) ;check that the position exists on the grid
 (let [newPiece (update-position p coords)] ;the new piece as a result of moving
 (populate-board              ;replace dead-pieces with nils
 (-> @(game-map :board-atom)  ;deref the appropriate board atom 
@@ -104,16 +103,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
   [m b pos]
  (let [[x y] pos]
  (nil? 
-  (nth b (translate-position x y m))))) 
-
-(defmacro bury-dead 
-"Will filter out dead-pieces from a collection"
-  [c]
- `(filter (complement dead-piece?) ~c)) 
+  (nth b (translate-position x y m)))))  
  
-(defn clean [c]
- (filter #(and (not (nil? %)) 
-               (not (dead-piece? %)))  c))                
+(defn bury-dead [c]
+ (filter alive? c))                
 
 (defn -main ;lein generated
   "I don't do a whole lot."
