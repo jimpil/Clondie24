@@ -39,9 +39,7 @@
 (def current-checkers 
 "This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
 (add-watch 
-(atom nil #_(vec (core/starting-board details))) 
-      ;:validator #(== 24 (count %)) 
-  :log (partial core/log-board core/board-history)))
+(atom nil) :log (partial core/log-board core/board-history)))
   
 (def details "Returns a map that describes the game of checkers."
               {:name 'checkers
@@ -69,7 +67,7 @@
                            rank ^Integer value] 
  core/Piece 
  (update-position [this np]  (make-checker color np :rank rank))
- (die     [this] (vary-meta this assoc :dead true)) ;communicate death through meta-data 
+ (die     [this] (vary-meta this assoc :alive false)) ;communicate death through meta-data 
  (promote [this] (make-checker color position :rank 'prince)) ; a checker is promoted to prince
  (getListPosition [this] (core/translate-position  (first  position) 
                                                    (second position) board-mappings-checkers))
@@ -84,7 +82,7 @@
                           ^clojure.lang.PersistentVector end-pos]
  core/MoveCommand
  (try-move [this] (move-checker p end-pos))
- (execute [this]  (reset! (get details :board-atom) (core/try-move this)))  ;STATE CHANGE!
+ (execute [this]  (reset! (:board-atom details) (core/try-move this)))  ;STATE CHANGE!
  (undo    [this]  (move-checker p start-pos))
  Object
  (toString [this] 
