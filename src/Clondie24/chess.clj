@@ -55,7 +55,7 @@
 (def chess-moves {:pawn     nil ;TODO
                   :rook     nil ;TODO
                   :bishop   nil ;TODO
-                  :knight   #(rul/knight-moves %1 %2)
+                  :knight   #(rul/knight-moves %1 %2) ;ready 
                   :queen    nil   ;TODO
                   :king     nil}) ;TODO
                   
@@ -98,10 +98,10 @@
                         rank ^Integer value]
  core/Piece 
  (update-position [this np] (make-chessItem image position rank))
- (die [this]     (vary-meta this assoc :dead true)) ;communicate death through meta-data 
+ (die [this]     (vary-meta this assoc :alive false)) ;communicate death through meta-data 
  (promote [this] (make-chessItem image position :rank 'queen)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first  position) 
-                                                  (second position) (details :mappings)))
+                                                  (second position) (:mappings details)))
  (getPoint [this] (ut/make-point position))
  (getMoves [this] (rank->moves this)) ;returns a list of points [x y]
  Object
@@ -113,7 +113,7 @@
                        ^clojure.lang.PersistentVector end-pos]
  core/MoveCommand
  (try-move [this] (move-chessItem p end-pos))
- (execute [this]  (reset! (get details :board-atom) (core/try-move this))) ;STATE CHANGE!
+ (execute [this]  (reset! (:board-atom details) (core/try-move this))) ;STATE CHANGE!
  (undo    [this]  (move-chessItem p start-pos))
  Object
  (toString [this] 
