@@ -11,9 +11,21 @@
         args (map #(symbol (str "x" %)) (range (- max-arg-count 2)))]
     (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
     
+(defn record-factory-aux 
+"Same as record-factory but using the auxiliary constructor of records which accepts a meta-data map and a field extension map as extra args. " [recordname]
+  (let [recordclass ^Class (resolve (symbol recordname))
+        max-arg-count (apply max (map #(count (.getParameterTypes %))
+                                      (.getConstructors recordclass)))
+        args (map #(symbol (str "x" %)) (range max-arg-count))]
+    (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
+
+(defn double? [e]
+(if (= (class e) (Class/forName  "java.lang.Double")) true false))
+    
 (defn vector-of-doubles 
-^clojure.lang.PersistentVector [v] 
-(vec (map double v)))       
+^clojure.lang.PersistentVector [v]
+(if (every? double? v) v
+    (vec (map double v))))       
     
 (defmacro doeach 
 "Like doseq but in a map-like manner. Assumes f is side-effecty." 
@@ -91,7 +103,7 @@
     (.setSize 500 600)
     (.setVisible true)))
     
-(defmacro inspect-board [game] ;fails if the first element is nil
-`(inspect-table ;(get (~game) :characteristics)  
+(defmacro inspect-board [game] 
+`(inspect-table 
  (deref (get (~game) :board-atom))))          
     
