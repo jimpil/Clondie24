@@ -9,26 +9,24 @@
 (def ^:const board-mappings-checkers 
 "A vector of vectors. Outer vector represents the 32 (serial) positions checkers can position themselves on. 
  Each inner vector represents the coordinates of that position on the 8x8 grid."
-[
-[1.0 0.0] [3.0 0.0] [5.0 0.0] [7.0 0.0] 
-[6.0 1.0] [4.0 1.0] [2.0 1.0] [0.0 1.0]
-[1.0 2.0] [3.0 2.0] [5.0 2.0] [7.0 2.0] 
-[6.0 3.0] [4.0 3.0] [2.0 3.0] [0.0 3.0]
-[1.0 4.0] [3.0 4.0] [5.0 4.0] [7.0 4.0]
-[6.0 5.0] [4.0 5.0] [2.0 5.0] [0.0 5.0]
-[1.0 6.0] [3.0 6.0] [5.0 6.0] [7.0 6.0]
-[6.0 7.0] [4.0 7.0] [2.0 7.0] [0.0 7.0]
-])
+[[1.0 0.0] [3.0 0.0] [5.0 0.0] [7.0 0.0] 
+ [6.0 1.0] [4.0 1.0] [2.0 1.0] [0.0 1.0]
+ [1.0 2.0] [3.0 2.0] [5.0 2.0] [7.0 2.0] 
+ [6.0 3.0] [4.0 3.0] [2.0 3.0] [0.0 3.0]
+ [1.0 4.0] [3.0 4.0] [5.0 4.0] [7.0 4.0]
+ [6.0 5.0] [4.0 5.0] [2.0 5.0] [0.0 5.0]
+ [1.0 6.0] [3.0 6.0] [5.0 6.0] [7.0 6.0]
+ [6.0 7.0] [4.0 7.0] [2.0 7.0] [0.0 7.0]])
 
 
 ;RED is machine (north camp), YELLOW is human (south camp)            
 (defn checkers-colors [c1 c2] 
 (vec (map ut/make-color (list c1 c2))))
 
-(declare make-checker, details)
+(declare make-checker)
 
 (defn starting-checkers
-"Will construct a set of initial checkers (12). opponent? specifies the side of the board where the pieces should be placed (true for north false for south).   " 
+"Will construct a set of initial checkers (12). opponent? specifies the side of the board where the pieces should be placed (true for north false for south)." 
 [opponent?]
 (let [[red yellow] (checkers-colors 'RED 'YELLOW)]                                   
 (if opponent?  
@@ -41,12 +39,11 @@
 (def current-checkers 
 "This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
 (add-watch 
-(atom nil #_(vec (core/starting-board (details)))) 
+(atom nil #_(vec (core/starting-board details))) 
       ;:validator #(== 24 (count %)) 
   :log (partial core/log-board core/board-history)))
   
-(defn details "Returns a map that describes the game of checkers."
-^clojure.lang.PersistentArrayMap []
+(def details "Returns a map that describes the game of checkers."
               {:name 'checkers
                :players 2 
                :colors (checkers-colors 'RED 'YELLOW)
@@ -58,11 +55,12 @@
                :record-name "Clondie24.checkers.CheckersPiece"
                :mappings board-mappings-checkers
                :north-player-start  (starting-checkers true)
-               :south-player-start  (starting-checkers false)})
+               :south-player-start  (starting-checkers false)})              
+            
 
 ;partially apply move with game locked in as 1st
-(def move-checker   (partial core/move  (details)))
-(def make-checker   (partial core/make-piece (details)))                
+(def move-checker   (partial core/move  details))
+(def make-checker   (partial core/make-piece details))                
 (def vacant-checker-tile?  (partial core/vacant? board-mappings-checkers))  
                 
 
@@ -73,27 +71,24 @@
  (update-position [this np]  (make-checker color np :rank rank))
  (die     [this] (vary-meta this assoc :dead true)) ;communicate death through meta-data 
  (promote [this] (make-checker color position :rank 'prince)) ; a checker is promoted to prince
- (getGridPosition [this] position)
  (getListPosition [this] (core/translate-position  (first  position) 
                                                    (second position) board-mappings-checkers))
  (getPoint [this] (ut/make-point position))
  (getMoves [this] nil) ;TODO
  Object
  (toString [this] 
-   (println "Checker (" rank ") at position:" (core/getListPosition this) " ->" (core/getGridPosition this))) )
+   (println "Checker (" rank ") at position:" (core/getListPosition this) " ->" position)) )
  
 (defrecord CheckersMove [ ^CheckersPiece p
                           ^clojure.lang.PersistentVector start-pos 
                           ^clojure.lang.PersistentVector end-pos]
  core/MoveCommand
- (try-move [this] (move-checker p (core/getEndPos this)))
- (execute [this]  (reset! (get (details) :board-atom) (core/try-move this)))  ;STATE CHANGE!
- (undo    [this]  (move-checker p (core/getStartPos this)))
- (getStartPos [_] (ut/vector-of-doubles start-pos))
- (getEndPos   [_] (ut/vector-of-doubles end-pos))
+ (try-move [this] (move-checker p end-pos))
+ (execute [this]  (reset! (get details :board-atom) (core/try-move this)))  ;STATE CHANGE!
+ (undo    [this]  (move-checker p start-pos))
  Object
  (toString [this] 
-   (println "Chess-move originating from" (core/getStartPos this) "to" (core/getEndPos this)))) 
+   (println "Chess-move originating from" start-pos "to" end-pos))) 
    
 (defn to-2d [b] ; the checkers or chess board as 8 rows of 8 columns
 (map vec        ;apply 'reverse' to every second item in 1d-board
