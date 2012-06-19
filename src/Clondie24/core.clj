@@ -25,12 +25,9 @@
  
  (defprotocol MoveCommand 
  "The Command design pattern in action (allows us to undo commands)."
- (try-move [this])
- (execute [this])
- (undo    [this])
- (getStartPos [this])
- (getEndPos   [this])
-)
+ (try-move [this]) 
+ (execute [this]) 
+ (undo    [this]))
  
  
 (defn translate-position
@@ -41,8 +38,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (if-not (nil? grid-loc) grid-loc 
 (throw (IllegalStateException. (str "NOT a valid list-location: " i))))))
 ([x y ^clojure.lang.PersistentVector mappings] ;{:post [(not (== % -1))]} 
-(let [list-loc (.indexOf mappings (vector (double x)  (double y)))] ;will translate from 2d to 1d
-(if-not (== list-loc -1) list-loc 
+(let [list-loc (.indexOf mappings [x y])] ;will translate from 2d to 1d
+(if-not (= list-loc -1) list-loc 
 (throw (IllegalStateException. (str "NOT a valid grid-location: [" x "," y "]")))))))
 
                     
@@ -50,11 +47,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 "The central function for creating pieces. A piece is simply a record with 4 keys."
  [game c pos &{:keys [rank]
                :or {rank 'zombie}}]
-(with-meta 
-   ((ut/record-factory (game :record-name)) c pos rank 
-   (get (game :rel-values) (keyword rank))) 
-{:dead false}))   ;pieces are born 'alive'              
-             
+ ((ut/record-factory-aux (game :record-name)) c 
+  (ut/vector-of-doubles pos) rank 
+  (get (game :rel-values) (keyword rank)) {:dead false} ;pieces are born 'alive'             
+                                           nil))        ;no field-extension map                          
                                
 (defn starting-board [game] 
 "Returns the initial board for a game with pieces on correct starting positions."
@@ -74,7 +70,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (repeat (game :board-size) nil))
 
 (defn populate-board 
-"Builds a new board with nils instead of dead pieces." 
+"Builds a new board with nils where dead pieces were." 
 [board]     
 (into [] (map #(if (or (nil? %) 
                        (dead-piece? %)) nil %) board)))
@@ -90,7 +86,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (-> @(game-map :board-atom)  ;deref the appropriate board atom 
      (assoc (getListPosition p) nil) 
      (assoc (getListPosition newPiece) newPiece))))
-(throw (IllegalArgumentException. (str coords " is NOT a valid position according to the mappings provided!")))))
+(throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!")))))
 
 
 ;(for [letter "ABCDEFGH" ;strings are seqable
