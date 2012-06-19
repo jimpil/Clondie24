@@ -10,16 +10,14 @@
 (def ^:const board-mappings-chess
 "A vector of vectors. Outer vector represents the 64 (serial) positions chess-items can position themselves on. 
  Each inner vector represents the coordinates of that position on the 8x8 grid."
-[
-[0.0 0.0] [1.0 0.0] [2.0 0.0] [3.0 0.0] [4.0 0.0] [5.0 0.0] [6.0 0.0] [7.0 0.0]
-[7.0 1.0] [6.0 1.0] [5.0 1.0] [4.0 1.0] [3.0 1.0] [2.0 1.0] [1.0 1.0] [0.0 1.0]
-[0.0 2.0] [1.0 2.0] [2.0 2.0] [3.0 2.0] [4.0 2.0] [5.0 2.0] [6.0 2.0] [7.0 2.0]
-[7.0 3.0] [6.0 3.0] [5.0 3.0] [4.0 3.0] [3.0 3.0] [2.0 3.0] [1.0 3.0] [0.0 3.0]
-[0.0 4.0] [1.0 4.0] [2.0 4.0] [3.0 4.0] [4.0 4.0] [5.0 4.0] [6.0 4.0] [7.0 4.0]
-[7.0 5.0] [6.0 5.0] [5.0 5.0] [4.0 5.0] [3.0 5.0] [2.0 5.0] [1.0 5.0] [0.0 5.0]
-[0.0 6.0] [1.0 6.0] [2.0 6.0] [3.0 6.0] [4.0 6.0] [5.0 6.0] [6.0 6.0] [7.0 6.0]
-[7.0 7.0] [6.0 7.0] [5.0 7.0] [4.0 7.0] [3.0 7.0] [2.0 7.0] [1.0 7.0] [0.0 7.0]
-])
+[[0.0 0.0] [1.0 0.0] [2.0 0.0] [3.0 0.0] [4.0 0.0] [5.0 0.0] [6.0 0.0] [7.0 0.0]
+ [7.0 1.0] [6.0 1.0] [5.0 1.0] [4.0 1.0] [3.0 1.0] [2.0 1.0] [1.0 1.0] [0.0 1.0]
+ [0.0 2.0] [1.0 2.0] [2.0 2.0] [3.0 2.0] [4.0 2.0] [5.0 2.0] [6.0 2.0] [7.0 2.0]
+ [7.0 3.0] [6.0 3.0] [5.0 3.0] [4.0 3.0] [3.0 3.0] [2.0 3.0] [1.0 3.0] [0.0 3.0]
+ [0.0 4.0] [1.0 4.0] [2.0 4.0] [3.0 4.0] [4.0 4.0] [5.0 4.0] [6.0 4.0] [7.0 4.0]
+ [7.0 5.0] [6.0 5.0] [5.0 5.0] [4.0 5.0] [3.0 5.0] [2.0 5.0] [1.0 5.0] [0.0 5.0]
+ [0.0 6.0] [1.0 6.0] [2.0 6.0] [3.0 6.0] [4.0 6.0] [5.0 6.0] [6.0 6.0] [7.0 6.0]
+ [7.0 7.0] [6.0 7.0] [5.0 7.0] [4.0 7.0] [3.0 7.0] [2.0 7.0] [1.0 7.0] [0.0 7.0]])
 
 
 (def chess-images 
@@ -64,20 +62,17 @@
 (defn rank->moves 
 "Returns all legal moves of p depending on rank of p." 
 [p] 
-(let [gpos (core/getGridPosition p)]
-((chess-moves (keyword (:rank p))) ;will return a fn
+(let [gpos (:position p)]
+((chess-moves (keyword (:rank p))) ;will return a fn which is called with current x and y
  (first gpos) (second gpos))))
 
                       
 (def current-chessItems
 "This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
 (add-watch 
-(atom nil #_(vec (core/starting-board (details))) ) 
-      ;:validator #(== 32 (count %))   
-  :log (partial core/log-board core/board-history)))                       
+(atom nil) :log (partial core/log-board core/board-history)))                           
                       
-(defn details 
-"Returns a map that describes the game of chess." []
+(def details "The map that describes the game of chess."
               {:name 'chess
                :players 2 
                :images chess-images
@@ -94,9 +89,9 @@
                
   
 ;partially apply move with game and chess-mappings locked in as 1st & 2nd args
-(def move-chessItem (partial core/move  (details)))  
-(def make-chessItem (partial core/make-piece (details))) 
-(def vacant-chess-tile? (partial core/vacant? (get (details) :mappings)))
+(def move-chessItem (partial core/move  details))  
+(def make-chessItem (partial core/make-piece details)) 
+(def vacant-chess-tile? (partial core/vacant?  board-mappings-chess))
 
 (defrecord ChessPiece [^java.awt.Image image 
                        ^clojure.lang.PersistentVector position 
@@ -105,27 +100,24 @@
  (update-position [this np] (make-chessItem image position rank))
  (die [this]     (vary-meta this assoc :dead true)) ;communicate death through meta-data 
  (promote [this] (make-chessItem image position :rank 'queen)) ;a pawn is promoted to a queen
- (getGridPosition [this] position)
  (getListPosition [this] (core/translate-position (first  position) 
-                                                  (second position) (get (details) :mappings)))
+                                                  (second position) (details :mappings)))
  (getPoint [this] (ut/make-point position))
  (getMoves [this] (rank->moves this)) ;returns a list of points [x y]
  Object
  (toString [this] 
-   (println "ChessItem (" rank ") at position:" (core/getListPosition this) " ->" (core/getGridPosition this))) )
+   (println "ChessItem (" rank ") at position:" (core/getListPosition this) " ->" position)) )
 
  (defrecord ChessMove [^ChessPiece p
                        ^clojure.lang.PersistentVector start-pos 
                        ^clojure.lang.PersistentVector end-pos]
  core/MoveCommand
- (try-move [this] (move-chessItem p (core/getEndPos this)))
- (execute [this]  (reset! (get (details) :board-atom) (core/try-move this))) ;STATE CHANGE!
- (undo    [this]  (move-chessItem p (core/getStartPos this)))
- (getStartPos [_] (ut/vector-of-doubles start-pos))
- (getEndPos   [_] (ut/vector-of-doubles end-pos))
+ (try-move [this] (move-chessItem p end-pos))
+ (execute [this]  (reset! (get details :board-atom) (core/try-move this))) ;STATE CHANGE!
+ (undo    [this]  (move-chessItem p start-pos))
  Object
  (toString [this] 
-   (println "Checkers-move originating from" (core/getStartPos this) "to" (core/getEndPos this))))                
+   (println "Checkers-move originating from" start-pos "to" end-pos)))                
 ;---------------------------------------------------------------------------------------------               
 (def chess-1d (range 64)) ;;the chess board as a list 
 (def ^:dynamic black-direction -1)
