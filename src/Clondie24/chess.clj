@@ -1,7 +1,7 @@
 (ns Clondie24.chess 
     (:require [Clondie24.util :as ut] 
               [Clondie24.core :as core]
-              [Clondie24.rules :as rul])
+              [Clondie24.rules :as rul] :verbose)
 )
 
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
