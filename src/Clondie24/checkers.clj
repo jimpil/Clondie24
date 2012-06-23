@@ -1,7 +1,7 @@
 (ns Clondie24.checkers
      (:require [Clondie24.util :as ut] 
                [Clondie24.core :as core]
-               [Clondie24.rules :as rul])
+               [Clondie24.rules :as rul] :verbose)
 )
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
@@ -37,7 +37,7 @@
 )))               
 
 (def current-checkers 
-"This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
+"This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement of any game from core."
 (add-watch 
 (atom nil) :log (partial core/log-board core/board-history)))
   
