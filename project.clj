@@ -5,9 +5,11 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/core.logic "0.7.4"]
+                 [midje "1.4.0"]
                  ;[clojure-encog "0.4.0-SNAPSHOT"]
                  ]
-                 
+  :plugins [[lein-swank "1.4.4"]]
+  ;:dev-dependencies [[lein-midje "2.0.0-SNAPSHOT"]]              
   :jvm-opts ["-Xmx512m" "-server"] 
  ;:javac-options {:classpath "target/dependency/encog-core-3.1.0.jar" :destdir "target/classes"}
  ;:java-source-path "src/java"
