@@ -1,6 +1,5 @@
 (ns Clondie24.util
-      (:use [clojure.pprint :only (pprint, print-table)]
-            #_[clojure.inspector :only (inspect-table)]))
+    (:use [clojure.pprint :only (pprint, print-table)]))
             
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
