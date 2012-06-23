@@ -49,7 +49,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                :or {rank 'zombie}}]
  ((ut/record-factory-aux (:record-name game)) c 
   (ut/vector-of-doubles pos) rank 
-  (get (game :rel-values) (keyword rank)) {:alive true} ;pieces are born 'alive'             
+  ((keyword rank) (game :rel-values)) {:alive true} ;pieces are born 'alive'             
                                            nil))        ;no extra fields                          
                                
 (defn starting-board [game] 
@@ -67,10 +67,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn empty-board 
 "Returns an empty board for the game provided - all nils." 
 [game] 
-(repeat (game :board-size) nil))
+(repeat (:board-size game) nil))
 
 (defn populate-board 
-"Builds a new board with nils where dead pieces were." 
+"Builds a new board with nils where dead pieces." 
 [board]     
 (into [] (map #(if (alive? %) % nil) board)))
                
@@ -112,5 +112,4 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
   "I don't do a whole lot."
   [& args]
   (println "Hello, Clondie24!"))
-  
   
