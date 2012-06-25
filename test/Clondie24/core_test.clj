@@ -27,6 +27,11 @@
 (fact (translate-position 0 1 dummy-mappings) => 1)
 (fact (translate-position 0 0 dummy-mappings) => 0)
 
+(fact (try (translate-position 2 0 dummy-mappings) ;INVALID POSITION
+      (catch Exception e :caught)) => :caught 
+(provided 
+      (translate-position 2 0 dummy-mappings) =throws=> (IllegalStateException.)))
+
 
 
 
