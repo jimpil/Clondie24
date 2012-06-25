@@ -37,7 +37,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (let [grid-loc (get mappings i)] ;will translate from 1d to 2d
 (if-not (nil? grid-loc) grid-loc 
 (throw (IllegalStateException. (str "NOT a valid list-location: " i))))))
-([x y ^clojure.lang.PersistentVector mappings] ;{:post [(not (== % -1))]} 
+([x y mappings] ;{:post [(not (== % -1))]} 
 (let [list-loc (.indexOf mappings [x y])] ;will translate from 2d to 1d
 (if-not (= list-loc -1) list-loc 
 (throw (IllegalStateException. (str "NOT a valid grid-location: [" x "," y "]")))))))
