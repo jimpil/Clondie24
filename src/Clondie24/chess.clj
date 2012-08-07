@@ -44,12 +44,12 @@
 
 (defn starting-chessItems
 "Will construct a set of initial chess items (16). opponent? specifies the side of the board where the pieces should be placed (true for north false for south)."
-[opponent?]
-(if opponent?  
+[black?]
+(if black?  
 (map #(make-chessItem (second (chess-images (keyword %2))) 
-      (core/translate-position % board-mappings-chess) :rank %2) (range 16) chessPos->rank)
+      (core/translate-position % board-mappings-chess) :rank %2 :direction 1) (range 16) chessPos->rank)
 (map #(make-chessItem (first (chess-images (keyword %2))) 
-      (core/translate-position % board-mappings-chess) :rank %2) (range 48 64) (reverse chessPos->rank))      
+      (core/translate-position % board-mappings-chess) :rank %2 :direction -1) (range 48 64) (reverse chessPos->rank))      
 ))
 
 (def chess-moves {:pawn     #(rul/pawn-moves %1 %2 %3) ;moving a pawn expects a direction as well as x, y 
@@ -61,19 +61,19 @@
                   
 (defn rank->moves 
 "Returns all legal moves of piece p depending on rank of p. Direction d is only required for pawns." 
-[p & d] 
+[p] 
 (let [[x y] (:position p) 
       r (keyword (:rank p))]
 (apply (r chess-moves) ;will return a fn which is called with current x and y
  (if-not (= r :pawn) 
-         (list x y) 
-         (list x y (first d))))))
+         (list (int x) (int y)) 
+         (list (int x) (int y) (:direction p))))))
 
                       
 (def current-chessItems
 "This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
-(add-watch 
-(atom nil) :log (partial core/log-board core/board-history)))                           
+(add-watch (atom nil) 
+ :log (partial core/log-board core/board-history)))                           
                       
 (def details "The map that describes the game of chess."
               {:name 'chess
@@ -98,9 +98,9 @@
 
 (defrecord ChessPiece [^java.awt.Image image 
                        ^clojure.lang.PersistentVector position 
-                        rank ^Integer value]
+                        rank ^Integer value direction]
  core/Piece 
- (update-position [this np] (make-chessItem image position rank))
+ (update-position [this np] (make-chessItem image np :rank rank))
  (die [this]     (vary-meta this assoc :alive false)) ;communicate death through meta-data 
  (promote [this] (make-chessItem image position :rank 'queen)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first  position) 
@@ -120,9 +120,27 @@
  (undo    [this]  (move-chessItem p start-pos))
  Object
  (toString [this] 
-   (println "Checkers-move originating from" start-pos "to" end-pos)))                
+   (println "Chess-move originating from" start-pos "to" end-pos)))                
 ;---------------------------------------------------------------------------------------------               
 (def chess-1d (range 64)) ;;the chess board as a list 
 (def ^:dynamic black-direction -1)
-(def ^:dynamic white-direction 1)              
+(def ^:dynamic white-direction 1)   
+
+(comment
+;start the game up
+(reset! (:board-atom details) (core/starting-board details))
+(let [p (nth @(:board-atom details) 8) ;some random piece
+      m (ChessMove. p (:position p) [3 2])]  ;some randome empty position  
+(core/execute m))
+ 
+(ut/inspect-board details)
+      
+)      
+      
+      
+
+
+
+
+           
                
