@@ -6,15 +6,17 @@
 (defn record-factory [recordname]
   (let [recordclass ^Class (resolve (symbol recordname))
         max-arg-count (apply max (map #(count (.getParameterTypes %))
-                                      (.getConstructors recordclass)))
+                                       (.getConstructors recordclass)))
         args (map #(symbol (str "x" %)) (range (- max-arg-count 2)))]
     (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
     
 (defn record-factory-aux 
-"Same as record-factory but using the auxiliary constructor of records which accepts a meta-data map and a field extension map as extra args. " [recordname]
+"Same as record-factory but using the auxiliary constructor of records which accepts a meta-data map and 
+ a field extension map as extra args. Useful." 
+ [recordname]
   (let [recordclass ^Class (resolve (symbol recordname))
         max-arg-count (apply max (map #(count (.getParameterTypes %))
-                                      (.getConstructors recordclass)))
+                                       (.getConstructors recordclass)))
         args (map #(symbol (str "x" %)) (range max-arg-count))]
     (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
 
@@ -44,7 +46,7 @@
 [path-to-image]
 (try 
   (javax.imageio.ImageIO/read (java.io.File. path-to-image))
-(catch java.io.IOException e ;returning nil here is ok! 
+(catch java.io.IOException e ;returning nil here is ok for now! 
   (println path-to-image "does not exist! Reverting to 'nil'..."))))
 
 ;Helper fn for creting pre-defined Colours
@@ -102,7 +104,6 @@
     (.setSize 500 600)
     (.setVisible true)))
     
-(defmacro inspect-board [game] 
-`(inspect-table 
- (deref (:board-atom ~game))))          
+(defn inspect-boards [bs] ;the boards
+(map #(inspect-table %) bs))          
     
