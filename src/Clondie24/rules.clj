@@ -37,14 +37,32 @@
     [(< (- y 1) ymax) (== a x) (== b (- y 1))])         ;2nd possibility (1 step)
     (== q [a b])))))) 
     
+(defn checker-moves 
+"Returns the available moves for a checker (on a 8x8 grid) given its current position. No kills."
+[x y dir] 
+(let [xmax 8 ymax 8]
+  (if (pos? dir) 
+  (run* [q] 
+   (fresh [a b] 
+    (conde 
+     [(< (+ y 1) ymax) (< (+ x 1) xmax) (== a x) (== b y)]
+     [(< (+ y 1) ymax) (< (- x 1) xmax) (== a x) (== b y)]
+     (== q [a b]))))
+  (run* [q] 
+   (fresh [a b] 
+    (conde 
+     [(< (- y 1) ymax) (< (+ x 1) xmax) (== a x) (== b y)]
+     [(< (- y 1) ymax) (< (- x 1) xmax) (== a x) (== b y)]
+     (== q [a b])))))))    
+    
 (defn rook-moves 
 "Returns the available moves for a rook (on a 8x8 grid) given its current position."
 [x y]
  (run* [q]
  (fresh [a b]
  (conde 
-  [(membero a board) (!= a x) (== b y)] 
-  [(membero b board) (!= b y) (== a x)])
+  [(membero a board) (!= a x) (== b y)]  ;y is constant
+  [(membero b board) (!= b y) (== a x)]) ;x is constant
   (== q [a b]))))
   
 (defn queen-moves 
@@ -94,56 +112,5 @@
    (== q [a b]))))) ;return each solution in a vector [x, y]
 
 
-; The following 8 moves describe all the possible moves a knight
-; may make on a chess board, without leaving the chess board. The
-; size of the chess board is given by (Xmax, Ymax).
-(comment 
-move([X, Y, Xmax, Ymax], [A, B, Xmax, Ymax]) :-
-X + 1 < Xmax,
-Y + 2 < Ymax,
-A is X + 1,
-B is Y + 2. ;;---------------
 
-move([X, Y, Xmax, Ymax], [A, B, Xmax, Ymax]) :-
-X + 2 < Xmax,
-Y + 1 < Ymax,
-A is X + 2,
-B is Y + 1.;;------------------
-
-move([X, Y, Xmax, Ymax], [A, B, Xmax, Ymax]) :-
-X + 2 < Xmax,
-Y - 1 >= 0,
-A is X + 2,
-B is Y - 1.;;------------------
-
-move([X, Y, Xmax, Ymax], [A, B, Xmax, Ymax]) :-
-X + 1 < Xmax,
-Y - 2 >= 0,
-A is X + 1,
-B is Y - 2. ;--------------
-
-move([X, Y, Xmax, Ymax], [A, B, Xmax, Ymax]) :-
-X - 1 >= 0,
-Y - 2 >= 0,
-A is X - 1,
-B is Y - 2. ;;------------------
-
-move([X, Y, Xmax, Ymax], [A, B, Xmax, Ymax]) :-
-X - 2 >= 0,
-Y - 1 >= 0,
-A is X - 2,
-B is Y - 1. ;;--------------------
-
-move([X, Y, Xmax, Ymax], [A, B, Xmax, Ymax]) :-
-X - 2 >= 0,
-Y + 1 < Ymax,
-A is X - 2,
-B is Y + 1. ;;--------------------
-
-move([X, Y, Xmax, Ymax], [A, B, Xmax, Ymax]) :-
-X - 1 >= 0,
-Y + 2 < Ymax,
-A is X - 1,
-B is Y + 2.
-)
 
