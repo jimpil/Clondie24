@@ -52,12 +52,12 @@
       (core/translate-position % board-mappings-chess) :rank %2) (range 48 64) (reverse chessPos->rank))      
 ))
 
-(def chess-moves {:pawn     nil ;TODO
-                  :rook     nil ;TODO
-                  :bishop   nil ;TODO
-                  :knight   #(rul/knight-moves %1 %2) ;ready 
-                  :queen    nil   ;TODO
-                  :king     nil}) ;TODO
+(def chess-moves {:pawn     #(rul/pawn-moves %1 %2 %3) 
+                  :rook     #(rul/rook-moves %1 %2) 
+                  :bishop   #(rul/bishop-moves %1 %2) 
+                  :knight   #(rul/knight-moves %1 %2) 
+                  :queen    #(rul/queen-moves %1 %2) 
+                  :king     #(rul/king-moves %1 %2)})
                   
 (defn rank->moves 
 "Returns all legal moves of p depending on rank of p." 
