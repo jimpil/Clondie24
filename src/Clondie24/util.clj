@@ -47,7 +47,7 @@
 (catch java.io.IOException e ;returning nil here is ok! 
   (println path-to-image "does not exist! Reverting to 'nil'..."))))
 
-;Helper macro for creting pre-defined Colours
+;Helper fn for creting pre-defined Colours
 (defn make-color 
 "Helper fn for creting java.awt.Color given a color symbol (e.g 'RED)"
 ^java.awt.Color [^String predefined-name]
@@ -58,15 +58,15 @@
  (let [[x y] (.getGridPosition  p)]
  (java.awt.Point. x y))) 
  
-(defmacro no-nils "Filter out nils from a collection." 
-  [c] 
- `(filter (complement nil?) ~c))  
+(defn no-nils "Filter out nils from a collection." 
+ [c] 
+ (filter (complement nil?) c))  
  
-(defmacro print-board 
-"Will print the detailed board with nils where vacant. Calls build-board without 'cleaning' it." 
+(defn print-board 
+"Will print the detailed board with nils where vacant." 
 [game] 
-`(print-table (:characteristics (~game));the columns
-       (deref (:board-atom (~game)))))  ;the rows
+(print-table (:characteristics (game));the columns
+      (deref (:board-atom (game)))))  ;the rows
        
 
          
@@ -104,5 +104,5 @@
     
 (defmacro inspect-board [game] 
 `(inspect-table 
- (deref (get (~game) :board-atom))))          
+ (deref (:board-atom ~game))))          
     
