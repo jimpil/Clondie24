@@ -45,18 +45,20 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                     
 (defn make-piece 
 "The central function for creating pieces. A piece is simply a record with 4 keys."
- [game c pos &{:keys [rank]
-               :or {rank 'zombie}}]
+ [game c pos &{:keys [rank direction]
+               :or {rank 'zombie direction 1}}]
  ((ut/record-factory-aux (:record-name game)) c 
   (ut/vector-of-doubles pos) rank 
-  ((keyword rank) (game :rel-values)) {:alive true} ;pieces are born 'alive'             
-                                           nil))        ;no extra fields                          
+  ((keyword rank) (:rel-values game)) direction  
+  {:alive true}   ;pieces are born 'alive'             
+           nil))  ;no extra fields                          
                                
 (defn starting-board [game] 
-"Returns the initial board for a game with pieces on correct starting positions."
+"Returns the initial board for a game with pieces on correct starting positions for the particular game."
 (let [p1 (:north-player-start game)
       p2 (:south-player-start game)
-      vacant (- (:board-size game) (:total-pieces game))]
+      vacant (- (:board-size game) 
+                (:total-pieces game))]
 (vec (flatten
      (conj p2 (conj (repeat vacant nil) p1))))))
   
@@ -80,11 +82,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 [game-map p coords] 
 {:pre [(satisfies? Piece p)]}  ;safety comes first
 (if  (some #{(ut/vector-of-doubles coords)} (:mappings game-map)) ;check that the position exists on the grid
-(let [newPiece (update-position p coords)] ;the new piece as a result of moving
-(populate-board              ;replace dead-pieces with nils
-(-> @(game-map :board-atom)  ;deref the appropriate board atom 
+(let [newPiece (update-position p coords)] ;the new piece as a result of moving            
+(-> @(:board-atom game-map)  ;deref the appropriate board atom 
      (assoc (getListPosition p) nil) 
-     (assoc (getListPosition newPiece) newPiece))))
+     (assoc (getListPosition newPiece) newPiece)
+     (populate-board))) ;replace dead-pieces with nils
 (throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!")))))
 
 
