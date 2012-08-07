@@ -52,7 +52,7 @@
       (core/translate-position % board-mappings-chess) :rank %2) (range 48 64) (reverse chessPos->rank))      
 ))
 
-(def chess-moves {:pawn     #(rul/pawn-moves %1 %2 %3) 
+(def chess-moves {:pawn     #(rul/pawn-moves %1 %2 %3) ;moving a pawn expects a direction as well as x, y 
                   :rook     #(rul/rook-moves %1 %2) 
                   :bishop   #(rul/bishop-moves %1 %2) 
                   :knight   #(rul/knight-moves %1 %2) 
@@ -60,11 +60,14 @@
                   :king     #(rul/king-moves %1 %2)})
                   
 (defn rank->moves 
-"Returns all legal moves of p depending on rank of p." 
-[p] 
-(let [gpos (:position p)]
-((chess-moves (keyword (:rank p))) ;will return a fn which is called with current x and y
- (first gpos) (second gpos))))
+"Returns all legal moves of piece p depending on rank of p. Direction d is only required for pawns." 
+[p & d] 
+(let [[x y] (:position p) 
+      r (keyword (:rank p))]
+(apply (r chess-moves) ;will return a fn which is called with current x and y
+ (if-not (= r :pawn) 
+         (list x y) 
+         (list x y (first d))))))
 
                       
 (def current-chessItems
@@ -80,7 +83,7 @@
                :board-size 64 
                :total-pieces 32
                :rel-values (zipmap '(:queen :rook :knight :bishop :pawn :king) 
-                                   '(  9      5     3       3       1     100))
+                                   '(  9      5     3       3       1    100))
                :board-atom current-chessItems
                :record-name "Clondie24.chess.ChessPiece" 
                :mappings board-mappings-chess
