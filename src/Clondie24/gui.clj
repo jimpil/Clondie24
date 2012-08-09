@@ -1,9 +1,11 @@
 (ns Clondie24.gui
     (:require [Clondie24.util :as ut] 
-              [seesaw.core :as ss]
-))
+              [seesaw.core :as ss]))
 ;-------------------------------------<SOURCE-CODE>--------------------------------------------------------------------
 ;----------------------------------------------------------------------------------------------------------------------    
+(def curr-game 
+"Marker that indicates whether a game has been started. Holds a game-map."
+  (atom nil)) ;no game started initially
            
 (defn make-menubar 
 "Constructs and returns the entire menu-bar." []
@@ -48,6 +50,14 @@
     (doseq [y (range 0 h 50)]
         (.drawLine g 0 y w y))))
         
+(defn draw-images [d g]
+(let [b @(:board-atom curr-game) 
+      balance (partial * 50)]
+  (doseq [p b]
+  (let [[bx by] (map balance (:position p));the balanced coords
+         pic (:image p)]  ;the actual picture
+    (.drawImage g pic bx by nil))))) ;finally call g.drawImage()        
+        
 (defn draw-tiles [d g]
   (let [w (ss/width d)
         h (ss/height d)
@@ -57,16 +67,11 @@
                                   (ut/make-color 'BLACK)]))]  
     (doseq [[[x y] c] tiles]
        (.setColor g c)
-       (.fillRect g x y 50 50)) (draw-grid d g)))
-       
-(defn draw-images [game-map g]
-(let [b @(:board-atom game-map) 
-      balance (partial * 50)]
-  (doseq [p b]
-  (let [[bx by] (map balance (:position p));the balanced coords
-         pic (:image p)]  ;the actual picture
-    (.drawImage g pic bx by nil))))) ;finally call .drawImage
-              
+       (.fillRect g x y 50 50)) 
+(draw-grid d g) 
+  (when-not (nil? @curr-game) 
+         (draw-images d g))))
+             
  
 (defn make-canvas []
  (ss/canvas
