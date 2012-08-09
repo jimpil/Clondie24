@@ -35,7 +35,7 @@
 
 ;Helper fn for creting Points
 (defn make-point 
-"Helper fn for creting java.awt.Point" 
+"Helper fn for creting java.awt.Point out of a [x y] coords." 
 ^java.awt.Point [p]
 (let [[x y] p]
 (java.awt.Point. x y)))
@@ -51,8 +51,8 @@
 
 ;Helper fn for creting pre-defined Colours
 (defn make-color 
-"Helper fn for creting java.awt.Color given a color symbol (e.g 'RED)"
-^java.awt.Color [^String predefined-name]
+"Helper fn for creting java.awt.Color given a color symbol (e.g RED)"
+^java.awt.Color [predefined-name]
 (.get (.getField (Class/forName "java.awt.Color") 
       (str predefined-name)) nil)) 
       
@@ -67,9 +67,24 @@
 (defn print-board 
 "Will print the detailed board with nils where vacant." 
 [game] 
-(print-table (:characteristics (game));the columns
-      (deref (:board-atom (game)))))  ;the rows
-       
+(print-table (:characteristics game);the columns
+      (deref (:board-atom game))))  ;the rows
+
+(defn persist-board! 
+"Persists the board b on to the disk using Java serialization. Filename needs no extension - it will be appended (.ser)."
+[b fname]
+(with-open [out (java.io.ObjectOutputStream. 
+                (java.io.FileOutputStream. (str fname ".ser")))]
+                (.writeObject out b)))
+                
+(defn unpersist-board 
+"Un-Persists a vector from the disk using Java serialization. Filename needs no extension - it will be appended (.ser)." 
+^clojure.lang.PersistentVector [fname]
+(let [^clojure.lang.PersistentVector upb (promise)]
+  (with-open [in (java.io.ObjectInputStream. 
+                 (java.io.FileInputStream. (str fname ".ser")))] 
+                 (deliver upb (.readObject in)))
+       @upb))                      
 
          
 (defn old-table-model 
