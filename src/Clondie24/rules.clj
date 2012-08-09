@@ -46,14 +46,14 @@
    (fresh [a b] 
     (conde 
      [(< (+ y 1) ymax) (< (+ x 1) xmax) (== a x) (== b y)]
-     [(< (+ y 1) ymax) (< (- x 1) xmax) (== a x) (== b y)]
-     (== q [a b]))))
+     [(< (+ y 1) ymax) (< (- x 1) xmax) (== a x) (== b y)])
+     (== q [a b])))
   (run* [q] 
    (fresh [a b] 
     (conde 
      [(< (- y 1) ymax) (< (+ x 1) xmax) (== a x) (== b y)]
-     [(< (- y 1) ymax) (< (- x 1) xmax) (== a x) (== b y)]
-     (== q [a b])))))))    
+     [(< (- y 1) ymax) (< (- x 1) xmax) (== a x) (== b y)])
+     (== q [a b]))))))    
     
 (defn rook-moves 
 "Returns the available moves for a rook (on a 8x8 grid) given its current position."
