@@ -87,23 +87,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
      (assoc (getListPosition p) nil) 
      (assoc (getListPosition newPiece) newPiece)
      (populate-board))) ;replace dead-pieces with nils
-(throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!")))))
-
-(defn persist-board! 
-"Persists the board b on to the disk using Java serialization. Filename needs no extension - it will be appended."
-[b fname]
-(with-open [out (java.io.ObjectOutputStream. 
-                (java.io.FileOutputStream. (str fname ".ser")))]
-                (.writeObject out b)))
-                
-(defn unpersist-board 
-"Un-Persists a vector from the disk using Java serialization. Filename needs no extension - it will be appended." 
-^clojure.lang.PersistentVector [fname]
-(let [^clojure.lang.PersistentVector upb (promise)]
-  (with-open [in (java.io.ObjectInputStream. 
-                 (java.io.FileInputStream. (str fname ".ser")))] 
-                 (deliver upb (.readObject in)))
-       @upb))                
+(throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!"))))) 
 
 ;(for [letter "ABCDEFGH" ;strings are seqable
 ;     number (range 1 9)]
