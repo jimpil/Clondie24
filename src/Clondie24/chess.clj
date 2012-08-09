@@ -19,6 +19,7 @@
  [0.0 6.0] [1.0 6.0] [2.0 6.0] [3.0 6.0] [4.0 6.0] [5.0 6.0] [6.0 6.0] [7.0 6.0]
  [7.0 7.0] [6.0 7.0] [5.0 7.0] [4.0 7.0] [3.0 7.0] [2.0 7.0] [1.0 7.0] [0.0 7.0]])
 
+(def game-on? (atom false))
 
 (def chess-images 
 (zipmap '(:queen :rook :knight :bishop :pawn :king)
@@ -126,14 +127,22 @@
 (def ^:dynamic black-direction -1)
 (def ^:dynamic white-direction 1)   
 
+(defn start! 
+"Start a chess-game. Can only be called if the game is NOT on. Returns the starting-board." 
+[& args]
+(when-not @game-on?
+(do (reset! game-on? true) 
+    (reset! (:board-atom details) 
+            (core/starting-board details)))));mandatory before game starts
+
+
 (comment
 ;start the game up
-(reset! (:board-atom details) (core/starting-board details))
 (let [p (nth @(:board-atom details) 8) ;some random piece
-      m (ChessMove. p (:position p) [3 2])]  ;some randome empty position  
+      m (ChessMove. p (:position p) (first (core/getMoves p)))]  ;some random empty position  
 (core/execute m))
  
-(ut/inspect-board details)
+(inspect-boards @(:board-atom details)) ;should have 2 boards (the starting one and the one after the move)
       
 )      
       
