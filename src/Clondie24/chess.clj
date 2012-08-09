@@ -1,7 +1,8 @@
 (ns Clondie24.chess 
     (:require [Clondie24.util :as ut] 
               [Clondie24.core :as core]
-              [Clondie24.rules :as rul] :verbose)
+              [Clondie24.rules :as rul]
+              [Clondie24.gui :as gui] :verbose)
 )
 
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
@@ -131,7 +132,8 @@
 "Start a chess-game. Can only be called if the game is NOT on. Returns the starting-board." 
 [& args]
 (when-not @game-on?
-(do (reset! game-on? true) 
+(do (reset! game-on? true)
+    (reset! gui/curr-game details)
     (reset! (:board-atom details) 
             (core/starting-board details)))));mandatory before game starts
 
