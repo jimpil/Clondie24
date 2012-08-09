@@ -57,7 +57,16 @@
                                   (ut/make-color 'BLACK)]))]  
     (doseq [[[x y] c] tiles]
        (.setColor g c)
-       (.fillRect g x y 50 50)) ))
+       (.fillRect g x y 50 50)) (draw-grid d g)))
+       
+(defn draw-images [game-map g]
+(let [b @(:board-atom game-map) 
+      balance (partial * 50)]
+  (doseq [p b]
+  (let [[bx by] (map balance (:position p));the balanced coords
+         pic (:image p)]  ;the actual picture
+    (.drawImage g pic bx by nil))))) ;finally call .drawImage
+              
  
 (defn make-canvas []
  (ss/canvas
@@ -70,14 +79,14 @@
 "Constructs and returns the entire arena frame" []
  (ss/frame
     :title "Clondie24 Arena"
-    :size  [410 :by 452] 
+    :size  [421 :by 467] ;412 :by 452 with border=5
     :resizable? false
     :on-close :exit
     :menubar  (make-menubar)
     :content  (ss/border-panel
-               :border 5
-               :hgap 5
-               :vgap 5
+               :border 10
+               :hgap 10
+               :vgap 10
                ;:north  (make-toolbar)
                :center (make-canvas)
                :south  (ss/label :id :status :text "Ready!"))))              
