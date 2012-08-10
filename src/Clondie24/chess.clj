@@ -78,7 +78,7 @@
  :log (partial core/log-board core/board-history)))                           
                       
 (def details "The map that describes the game of chess."
-              {:name 'chess
+              {:name 'Chess
                :players 2 
                :images chess-images
                :characteristics [:image :position :rank :value]      
@@ -128,20 +128,24 @@
 (def ^:dynamic black-direction -1)
 (def ^:dynamic white-direction 1)   
 
-(defn start! 
-"Start a chess-game. Can only be called if the game is NOT on. Returns the starting-board." 
-[& args]
+(defn start-chess! 
+"Start a chess-game. Can only be called if the game is NOT 'on'. Returns the starting-board." 
+[]
 (when-not @game-on?
 (do (reset! game-on? true)
-    (reset! gui/curr-game details)
     (reset! (:board-atom details) 
             (core/starting-board details)))));mandatory before game starts
 
+(defmethod gui/new-game! 'Chess [_] (start-chess!)) ;hook on to the gui
 
+(defn -main 
+"Starts a graphical Chess game." 
+[& args]  (gui/show-gui! details))
+  
 (comment
 ;start the game up
 (let [p (nth @(:board-atom details) 8) ;some random piece
-      m (ChessMove. p (:position p) (first (core/getMoves p)))]  ;some random empty position  
+      m (ChessMove. p (:position p) (first (core/getMoves p)))]  ;some random empty position and the first available move  
 (core/execute m))
  
 (inspect-boards @(:board-atom details)) ;should have 2 boards (the starting one and the one after the move)
