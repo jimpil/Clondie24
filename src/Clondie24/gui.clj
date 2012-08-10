@@ -3,44 +3,46 @@
               [seesaw.core :as ss]))
 ;-------------------------------------<SOURCE-CODE>--------------------------------------------------------------------
 ;----------------------------------------------------------------------------------------------------------------------    
-(def curr-game 
-"Marker that indicates whether a game has been started. Holds a game-map."
-  (atom nil)) ;no game started initially
-           
+(def curr-game (atom nil)) 
+
+(defmulti new-game!
+  (fn [game-map] (:name game-map))) 
+  
+(defmethod new-game! :default [game]
+(throw (IllegalArgumentException.
+       (str "Unknown game: "  (:name game)))))
+
+            
 (defn make-menubar 
 "Constructs and returns the entire menu-bar." []
-(let [n-chess (ss/action :handler (fn [e] (ss/alert "Not implemented!")) 
-                         :name "Chess" 
-                         :tip "Start new Chess." 
-                         :key "menu C")
-      n-checkers (ss/action :handler (fn [e] (ss/alert "Not implemented!")) 
-                            :name "Checkers" 
-                            :tip "Start new Checkers." 
-                            :key "menu D")
+(let [a-new (ss/action  :handler (fn [e] (new-game! @curr-game)) 
+                        :name (str "New " (:name @curr-game)) 
+                        :tip  "Start new game." 
+                        :key  "menu N")                           
       a-save (ss/action :handler (fn [e] (ss/alert "Not implemented!")) 
-                        :name "Save as" 
+                        :name "Save" 
                         :tip "Save a game to disk." 
                         :key "menu S")
       a-load (ss/action :handler (fn [e] (ss/alert "Not implemented!")) 
                         :name "Load" 
-                        :tip "Load a game from disk." 
-                        :key "menu L")
+                        :tip  "Load a game from disk." 
+                        :key  "menu L")
       a-pref (ss/action :handler (fn [e] (ss/alert "Not implemented!")) 
                         :name "Preferences" 
-                        :tip "Show options" 
-                        :key "menu O")
+                        :tip  "Show options" 
+                        :key  "menu O")
       a-details (ss/action :handler (fn [e] (ss/alert "Not implemented!")) 
                            :name "Details" 
-                           :tip "Show info abou your PC."
-                           :key "menu I")
+                           :tip  "Show info abou your PC."
+                           :key  "menu I")
       a-bout    (ss/action :handler (fn [e] (ss/alert "Not implemented!")) 
                            :name "About" 
-                           :tip "A few words." 
-                           :key "menu A")]   
+                           :tip  "A few words." 
+                           :key  "menu A")]   
 (ss/menubar :items 
-   [(ss/menu :text "Game"    :items [(ss/menu :text "New" :items [n-chess n-checkers]) a-save a-load])
+   [(ss/menu :text "Game"    :items [a-new a-save a-load])
     (ss/menu :text "Options" :items [a-pref])
-    (ss/menu :text "Help"    :items [a-details a-bout])]  )))
+    (ss/menu :text "Help"    :items [a-details a-bout])]) ))
 
 (defn draw-grid [c g]
   (let [w (ss/width c)
@@ -63,14 +65,13 @@
         h (ss/height d)
         tiles (map vector (for [x (range 0 w 50) 
                                 y (range 0 h 50)] [x y]) 
-                          (cycle [(ut/make-color 'WHITE) 
-                                  (ut/make-color 'BLACK)]))]  
+                          (cycle [(ut/predefined-color 'lightGray) 
+                                  (ut/predefined-color 'black)]))]  
     (doseq [[[x y] c] tiles]
        (.setColor g c)
        (.fillRect g x y 50 50)) 
-(draw-grid d g) 
-  (when-not (nil? @curr-game) 
-         (draw-images d g))))
+ (draw-grid d g) 
+ (when-not (nil? curr-game) #_(draw-images d g))))
              
  
 (defn make-canvas []
@@ -94,10 +95,14 @@
                :vgap 10
                ;:north  (make-toolbar)
                :center (make-canvas)
-               :south  (ss/label :id :status :text "Ready!"))))              
+               :south  (ss/label :id :status :text "Ready!"))))
                
+(defn clear! [] (reset! curr-game nil))
 
-(defn -main [& args]
-#_(native!)
-  (doto (make-arena) ss/show!)) 
+(defn show-gui! [game-map] 
+  (do #_(ss/native!) 
+        (reset! curr-game game-map) ;firstly make the gui aware of what game we want it to display
+        (ss/invoke-later 
+          (doto (make-arena) ss/show!))))                            
+               
         
