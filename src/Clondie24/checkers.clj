@@ -21,7 +21,7 @@
 
 ;RED is machine (north camp), YELLOW is human (south camp)            
 (defn checkers-colors [c1 c2] 
-(vec (map ut/make-color (list c1 c2))))
+(vec (map ut/predefined-color (list c1 c2))))
 
 (declare make-checker)
 
