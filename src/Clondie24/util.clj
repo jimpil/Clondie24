@@ -42,7 +42,7 @@
 
 
 (defn make-image 
-"Returns a buffered-image from the specified file or nil if the file is not there.." 
+"Returns a buffered-image from the specified file or nil if the file is not there." 
 [path-to-image]
 (try 
   (javax.imageio.ImageIO/read (java.io.File. path-to-image))
@@ -50,11 +50,18 @@
   (println path-to-image "does not exist! Reverting to 'nil'..."))))
 
 ;Helper fn for creting pre-defined Colours
-(defn make-color 
-"Helper fn for creting java.awt.Color given a color symbol (e.g RED)"
-^java.awt.Color [predefined-name]
-(.get (.getField (Class/forName "java.awt.Color") 
-      (str predefined-name)) nil)) 
+(defn predefined-color 
+"Helper fn for creting java.awt.Color given a color symbol (e.g 'RED or 'red)."
+^java.awt.Color [name]
+(.get (.getField 
+        (Class/forName "java.awt.Color") (str name)) nil))
+
+(defn hex->color 
+"Hepler fn for creating Color objects from a hex literal (e.g. '0xFF0096)."
+ [hex-symbol] 
+ (try (java.awt.Color/decode (str hex-symbol)) 
+ (catch Exception e ; returning nil 
+        (println "Incorrect hex mapping."))))       
       
 (defn piece->point [p] ;needs to be in the gui namespace
  (let [[x y] (.getGridPosition  p)]
@@ -73,17 +80,17 @@
 (defn persist-board! 
 "Persists the board b on to the disk using Java serialization. Filename needs no extension - it will be appended (.ser)."
 [b fname]
-(with-open [out (java.io.ObjectOutputStream. 
-                (java.io.FileOutputStream. (str fname ".ser")))]
-                (.writeObject out b)))
+(with-open [oout (java.io.ObjectOutputStream. 
+                 (java.io.FileOutputStream. (str fname ".ser")))]
+                 (.writeObject oout b)))
                 
 (defn unpersist-board 
 "Un-Persists a vector from the disk using Java serialization. Filename needs no extension - it will be appended (.ser)." 
 ^clojure.lang.PersistentVector [fname]
-(let [^clojure.lang.PersistentVector upb (promise)]
-  (with-open [in (java.io.ObjectInputStream. 
-                 (java.io.FileInputStream. (str fname ".ser")))] 
-                 (deliver upb (.readObject in)))
+(let [^clojure.lang.PersistentVector upb (promise)] ;waiting for the value shortly
+  (with-open [oin (java.io.ObjectInputStream. 
+                  (java.io.FileInputStream. (str fname ".ser")))] 
+                  (deliver upb (.readObject oin)))
        @upb))                      
 
          
