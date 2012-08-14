@@ -23,24 +23,22 @@
  (getMoves [this]) ;pretends there is only this piece on the board - will need filtering for validity later
 ) 
  
- (defprotocol MoveCommand 
- "The Command design pattern in action (allows us to undo commands)."
+ (defprotocol Movable 
+ "The Command design pattern in action (allows us to do/undo moves)."
  (try-move [this]) 
- (execute [this]) 
- (undo    [this]))
- 
+ (getOrigin [this]))
  
 (defn translate-position
 "Translates a position from 1d to 2d and vice-versa. 
 Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'." 
 ([i mappings] ;{:post [(not (nil? %))]}   
-(let [grid-loc (get mappings i)] ;will translate from 1d to 2d
-(if-not (nil? grid-loc) grid-loc 
-(throw (IllegalStateException. (str "NOT a valid list-location: " i))))))
+  (let [grid-loc (get mappings i)] ;will translate from 1d to 2d
+    (if-not (nil? grid-loc) grid-loc 
+    (throw (IllegalStateException. (str "NOT a valid list-location: " i))))))
 ([x y mappings] ;{:post [(not (== % -1))]} 
-(let [list-loc (.indexOf mappings [x y])] ;will translate from 2d to 1d
-(if-not (= list-loc -1) list-loc 
-(throw (IllegalStateException. (str "NOT a valid grid-location: [" x "," y "]")))))))
+  (let [list-loc (.indexOf mappings [x y])] ;will translate from 2d to 1d
+    (if-not (= list-loc -1) list-loc 
+    (throw (IllegalStateException. (str "NOT a valid grid-location: [" x "," y "]")))))))
 
                     
 (defn make-piece 
@@ -82,13 +80,39 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 [game-map p coords] 
 {:pre [(satisfies? Piece p)]}  ;safety comes first
 (if  (some #{(ut/vector-of-doubles coords)} (:mappings game-map)) ;check that the position exists on the grid
-(let [newPiece (update-position p coords)] ;the new piece as a result of moving            
+(let [newPiece (update-position p coords) ;the new piece as a result of moving 
+      old-pos  (getListPosition p)
+      new-pos  (getListPosition newPiece)]            
 (-> @(:board-atom game-map)  ;deref the appropriate board atom 
-     (assoc (getListPosition p) nil) 
-     (assoc (getListPosition newPiece) newPiece)
+     (assoc old-pos nil) 
+     (assoc new-pos newPiece)
      (populate-board))) ;replace dead-pieces with nils
 (throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!"))))) 
 
+(defrecord Move [p mover ^clojure.lang.PersistentVector end-pos]
+ Movable
+ (try-move [this] (mover p end-pos))
+ (getOrigin [this] (:position p))
+ Object
+ (toString [this] 
+   (println "Move from:" (getOrigin this) "to:" end-pos)))   
+
+(defn dest->Move "Helper fn for creating moves." 
+[dm p dest]  (Move. p (partial move dm) dest))
+
+(defn execute! [^Move m batom]
+ (reset! batom (try-move m)))
+ 
+(defn- undo 
+"Returns the state which results from undoing this many levels. " 
+[levels] 
+(let [history @board-history
+      x-to-last (- (count history) (if (< 2 levels) (inc levels) 2))]
+  (nth history sec-to-last)))
+
+(defn undo! [levs]
+(swap! board-history #(vec (drop-last %2 %)) levs))      
+      
 ;(for [letter "ABCDEFGH" ;strings are seqable
 ;     number (range 1 9)]
 ;(format "%c%d" letter number)))
