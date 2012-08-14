@@ -5,13 +5,12 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/core.logic "0.7.5"]
-                 [midje "1.4.0"]
+                 [midje "1.4.0"] 
                  [seesaw "1.4.2"]
                  ;[clojure-encog "0.4.1-SNAPSHOT"] ;not needed yet
                  ]
-  :plugins [[lein-swank "1.4.4"]]
-  ;:dev-dependencies [[lein-midje "2.0.0-SNAPSHOT"]]              
-  :jvm-opts ["-Xmx512m" "-server"] 
+  :plugins [[lein-swank "1.4.4"]]             
+  :jvm-opts ["-Xmx1g" "-server"] 
  ;:javac-options {:classpath "target/dependency/encog-core-3.1.0.jar" :destdir "target/classes"}
  ;:java-source-path "src/java"
  ;:main     Clondie24.gui             
