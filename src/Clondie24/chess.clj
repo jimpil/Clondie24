@@ -2,7 +2,8 @@
     (:require [Clondie24.util :as ut] 
               [Clondie24.core :as core]
               [Clondie24.rules :as rul]
-              [Clondie24.gui :as gui] :verbose)
+              [Clondie24.search :as s]
+              [Clondie24.gui :as gui] :verbose :reload)
 )
 
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
@@ -45,7 +46,7 @@
 (declare make-chessItem, details) ;;will need these
 
 (defn starting-chessItems
-"Will construct a set of initial chess items (16). opponent? specifies the side of the board where the pieces should be placed (true for north false for south)."
+"Will construct a set of initial chess items (16). black? specifies the side of the board where the pieces should be placed (true for north false for south)."
 [black?]
 (if black?  
 (map #(make-chessItem (second (chess-images (keyword %2))) 
@@ -76,6 +77,10 @@
 "This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
 (add-watch (atom nil) 
  :log (partial core/log-board core/board-history)))                           
+
+ ;partially apply move with game details locked in as 1st arg 
+(def make-chessItem  (partial core/make-piece details)) 
+(def vacant-chess-tile? (partial core/vacant? board-mappings-chess)) 
                       
 (def details "The map that describes the game of chess."
               {:name 'Chess
@@ -91,12 +96,11 @@
                :mappings board-mappings-chess
                :north-player-start  (starting-chessItems true)    ;opponent
                :south-player-start  (starting-chessItems false)}) ;human
-               
-  
-;partially apply move with game and chess-mappings locked in as 1st & 2nd args
-(def move-chessItem (partial core/move  details))  
-(def make-chessItem (partial core/make-piece details)) 
-(def vacant-chess-tile? (partial core/vacant?  board-mappings-chess))
+
+ ;partially apply move with game details locked in as 1st arg
+;(defn chess-mover [] (partial core/move details))  
+(def make-chessItem  (partial core/make-piece details)) 
+(def vacant-chess-tile? (partial core/vacant? board-mappings-chess))              
 
 (defrecord ChessPiece [^java.awt.Image image 
                        ^clojure.lang.PersistentVector position 
@@ -111,18 +115,7 @@
  (getMoves [this] (rank->moves this)) ;returns a list of points [x y]
  Object
  (toString [this] 
-   (println "ChessItem (" rank ") at position:" (core/getListPosition this) " ->" position)) )
-
- (defrecord ChessMove [^ChessPiece p
-                       ^clojure.lang.PersistentVector start-pos 
-                       ^clojure.lang.PersistentVector end-pos]
- core/MoveCommand
- (try-move [this] (move-chessItem p end-pos))
- (execute [this]  (reset! (:board-atom details) (core/try-move this))) ;STATE CHANGE!
- (undo    [this]  (move-chessItem p start-pos))
- Object
- (toString [this] 
-   (println "Chess-move originating from" start-pos "to" end-pos)))                
+   (println "ChessItem (" rank ") at position:" (core/getListPosition this) " ->" position)) )                
 ;---------------------------------------------------------------------------------------------               
 (def chess-1d (range 64)) ;;the chess board as a list 
 (def ^:dynamic black-direction -1)
@@ -138,9 +131,15 @@
 
 (defmethod gui/new-game! 'Chess [_] (start-chess!)) ;hook on to the gui
 
+(defn chess-best-move [dir b n] 
+(s/start-search dir b n))
+
 (defn -main 
 "Starts a graphical Chess game." 
 [& args]  (gui/show-gui! details))
+
+(reset! s/curr-game details)    ;hook into search
+;(deliver core/curr-game details) ;hook into core (core should :reload each-time a new game hooks into it)
   
 (comment
 ;start the game up
