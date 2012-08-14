@@ -61,15 +61,24 @@
  [hex-symbol] 
  (try (java.awt.Color/decode (str hex-symbol)) 
  (catch Exception e ; returning nil 
-        (println "Incorrect hex mapping."))))       
+        (println "Incorrect hex mapping."))))
+         
+(defn hsb->color 
+"Hepler fn for creating Color objects from hue/saturation/brightness (e.g. 0.56, 1, 0.8)." 
+[h s b]
+(java.awt.Color/getHSBColor (float h) (float s) (float b)))
+
+(defn rgb->color [r g b] 
+ (java.awt.Color. (double r) (double g) (double b)))             
       
 (defn piece->point [p] ;needs to be in the gui namespace
  (let [[x y] (.getGridPosition  p)]
  (java.awt.Point. x y))) 
  
-(defn no-nils "Filter out nils from a collection." 
+(defn no-nils 
+"Filter out nils from a collection." 
  [c] 
- (filter (complement nil?) c))  
+ (remove nil? c))  
  
 (defn print-board 
 "Will print the detailed board with nils where vacant." 
