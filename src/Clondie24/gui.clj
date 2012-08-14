@@ -1,5 +1,6 @@
 (ns Clondie24.gui
-    (:require [Clondie24.util :as ut] 
+    (:require [Clondie24.util :as ut]
+              [Clondie24.core :as core] 
               [seesaw.core :as ss]))
 ;-------------------------------------<SOURCE-CODE>--------------------------------------------------------------------
 ;----------------------------------------------------------------------------------------------------------------------    
@@ -65,13 +66,15 @@
         h (ss/height d)
         tiles (map vector (for [x (range 0 w 50) 
                                 y (range 0 h 50)] [x y]) 
-                          (cycle [(ut/predefined-color 'lightGray) 
-                                  (ut/predefined-color 'black)]))]  
+                          (cycle [(ut/hex->color '0xffdead)
+                                  (ut/hsb->color 0.931 0.863 0.545)
+                                  ;(ut/predefined-color 'lightGray) 
+                                  #_(ut/predefined-color 'black)]))]  
     (doseq [[[x y] c] tiles]
        (.setColor g c)
        (.fillRect g x y 50 50)) 
  (draw-grid d g) 
- (when-not (nil? curr-game) #_(draw-images d g))))
+ (when-not (empty? @core/board-history) #_(draw-images d g))))
              
  
 (defn make-canvas []
