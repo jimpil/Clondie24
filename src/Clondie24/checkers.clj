@@ -57,7 +57,7 @@
             
 
 ;partially apply move with game locked in as 1st
-(def move-checker   (partial core/move  details))
+(def move-checker   (partial core/dest->Move details))
 (def make-checker   (partial core/make-piece details))                
 (def vacant-checker-tile?  (partial core/vacant? board-mappings-checkers))  
                 
@@ -76,17 +76,6 @@
  Object
  (toString [this] 
    (println "Checker (" rank ") at position:" (core/getListPosition this) " ->" position)) )
- 
-(defrecord CheckersMove [ ^CheckersPiece p
-                          ^clojure.lang.PersistentVector start-pos 
-                          ^clojure.lang.PersistentVector end-pos]
- core/MoveCommand
- (try-move [this] (move-checker p end-pos))
- (execute [this]  (reset! (:board-atom details) (core/try-move this)))  ;STATE CHANGE!
- (undo    [this]  (move-checker p start-pos))
- Object
- (toString [this] 
-   (println "Chess-move originating from" start-pos "to" end-pos))) 
    
 (defn to-2d [b] ; the checkers or chess board as 8 rows of 8 columns
 (map vec        ;apply 'reverse' to every second item in 1d-board
