@@ -30,22 +30,20 @@
 
 ;(def game-on? (atom false))
 
-(def chess-images 
+(def chess-images "All the chess images paired up according to rank."
 (zipmap '(:queen :rook :knight :bishop :pawn :king)
-                     [
-                      [(ut/make-image "white queen-image")
-                       (ut/make-image "black queen-image")]
-                      [(ut/make-image "white rook-image")
-                       (ut/make-image "black rook-image")]
-                      [(ut/make-image "white knight-image")
-                       (ut/make-image "black knight-image")]
-                      [(ut/make-image "white bishop-image")
-                       (ut/make-image "black bishop-image")]
-                      [(ut/make-image "white pawn-image")
-                       (ut/make-image "black pawn-image")]
-                      [(ut/make-image "white king-image")
-                       (ut/make-image "black king-image")]
-                      ]))
+                     [[(ut/make-image "images/50px/png/Yellow Q.png")
+                       (ut/make-image "images/50px/png/Black Q.png")]
+                      [(ut/make-image "images/50px/png/Yellow R.png")
+                       (ut/make-image "images/50px/png/Black R.png")]
+                      [(ut/make-image "images/50px/png/Yellow N.png")
+                       (ut/make-image "images/50px/png/Black N.png")]
+                      [(ut/make-image "images/50px/png/Yellow B.png")
+                       (ut/make-image "images/50px/png/Black B.png")]
+                      [(ut/make-image "images/50px/png/Yellow P.png")
+                       (ut/make-image "images/50px/png/Black P.png")]
+                      [(ut/make-image "images/50px/png/Yellow K.png")
+                       (ut/make-image "images/50px/png/Black K.png")]]))
 
 (def chessPos->rank 
 (flatten ['rook 'knight 'bishop 'queen 'king 'bishop 'knight 'rook (repeat 8 'pawn)]))
@@ -61,18 +59,18 @@
 (map #(make-chessItem (first (chess-images (keyword %2))) 
       (core/translate-position % board-mappings-chess) :rank %2 :direction -1) (range 48 64) (reverse chessPos->rank))      
 ))
+
 (def current-chessItems
 "This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
 (add-watch (atom nil) 
- :log (partial core/log-board core/board-history)))
+ :log (partial core/log-board core/board-history))) 
  
- 
-(def chess-moves {:pawn     (partial rul/pawn-moves board-mappings-chess ) 
-                  :rook     (partial rul/rook-moves board-mappings-chess )
-                  :bishop   (partial rul/bishop-moves board-mappings-chess ) 
+(def chess-moves {:pawn     (partial rul/pawn-moves board-mappings-chess) 
+                  :rook     (partial rul/rook-moves board-mappings-chess)
+                  :bishop   (partial rul/bishop-moves board-mappings-chess) 
                   :knight   #(rul/knight-moves % %2 %3) ;3rd arg is ignored 
-                  :queen    (partial rul/queen-moves board-mappings-chess )
-                  :king     (partial rul/king-moves board-mappings-chess  )})
+                  :queen    (partial rul/queen-moves board-mappings-chess)
+                  :king     (partial rul/king-moves board-mappings-chess)})
                                    
 (defn rank->moves 
 "Returns all legal moves of piece p depending on rank of p. Direction d is only required for pawns." 
@@ -85,7 +83,13 @@
 
  ;partially apply move with game details locked in as 1st arg 
 (def make-chessItem  (partial core/make-piece details)) 
-(def vacant-chess-tile? (partial core/vacant? board-mappings-chess)) 
+(def vacant-chess-tile? (partial core/vacant? board-mappings-chess))
+
+(defn start-chess! [] 
+"Start a chess-game. Returns the starting-board."
+(do (core/clear-history!) ;empty board-history
+    (reset! current-chessItems
+            (core/starting-board details))));mandatory before game starts 
                       
 (def details "The map that describes the game of chess."
               {:name 'Chess
@@ -102,6 +106,8 @@
                :mappings board-mappings-chess
                :north-player-start  (starting-chessItems true)    ;opponent
                :south-player-start  (starting-chessItems false)}) ;human
+               
+               
 
  ;partially apply move with game details locked in as 1st arg
 ;(defn chess-mover [] (partial core/move details))  
@@ -127,12 +133,7 @@
 (def ^:dynamic black-direction -1)
 (def ^:dynamic white-direction 1)   
 
-(defn start-chess! 
-"Start a chess-game. Returns the starting-board." 
-[]
-(do (core/clear-history!) ;empty board-history
-    (reset! (:board-atom details) 
-            (core/starting-board details))));mandatory before game starts
+
 
 ;(defmethod gui/new-game! 'Chess [_] (start-chess!) (reset! s/curr-game details)) ;hook on to the gui and search
 
