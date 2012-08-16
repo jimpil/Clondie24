@@ -6,11 +6,11 @@
 (defn game-tree
   "Generate the entire game tree lazily. For games like chess you MUST consume only a portion of it."
   [root? dir board successors-fn depth]
-  (let [mapper (if root? 'pmap 'map)]
+  (let [mapp (if root? pmap map)]
   {:node board
    :direction dir
    :children   (if (neg? depth) '()
-               ((eval mapper) #(game-tree false %2 %1 successors-fn (dec depth)) 
+               (mapp #(game-tree false %2 %1 successors-fn (dec depth)) 
                (successors-fn board dir) (cycle [(- dir) dir])))}))
 
     
