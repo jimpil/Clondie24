@@ -4,16 +4,17 @@
               [seesaw.core :as ssw]))
 ;-------------------------------------<SOURCE-CODE>--------------------------------------------------------------------
 ;----------------------------------------------------------------------------------------------------------------------    
-(def curr-game (atom nil)) 
+(def curr-game (promise)) 
+
+(defn clear! [] (core/clear-history!))
 
 (declare canvas status-label)
 
             
 (defn make-menubar 
 "Constructs and returns the entire menu-bar." []
-(let [a-new (ssw/action  :handler (fn [e] (do (apply (:game-starter @curr-game) '()) 
-                                              (ssw/repaint! canvas) 
-                                              (ssw/config! status-label :text "Game on! White moves first...")))
+(let [a-new (ssw/action  :handler (fn [e] (apply (:game-starter @curr-game) '()) 
+                                          (ssw/config! status-label :text "Game on! White moves first..."))
                         :name (str "New " (:name @curr-game)) 
                         :tip  "Start new game." 
                         :key  "menu N")                           
@@ -50,12 +51,12 @@
     (doseq [y (range 0 h 50)]
         (.drawLine g 0 y w y))))
         
-(defn draw-images [d g]
-(let [b @(:board-atom curr-game)
-      ps (filter (complement nil?) b) 
+(defn draw-images [g]
+(let [b  (:board-atom @curr-game) ;nil
+      ps (filter (complement nil?) @b) 
       balancer (partial * 50)]
   (doseq [p ps]
-  (let [[bx by] (map balancer (:position p));the balanced coords
+  (let [[bx by] (vec (map balancer (:position p)));the balanced coords
          pic (:image p)]  ;the actual picture
     (.drawImage g pic bx by nil))))) ;finally call g.drawImage()        
         
@@ -72,8 +73,8 @@
        (.setColor g c)
        (.fillRect g x y 50 50)) 
  (draw-grid d g) 
- (when-not (empty? @core/board-history) 
-           (println "I tried!") #_(draw-images d g))))
+ (when (seq @core/board-history) 
+               (draw-images g))))
              
  
 (def canvas
@@ -89,24 +90,30 @@
 "Constructs and returns the entire arena frame" []
  (ssw/frame
     :title "Clondie24 Arena"
-    :size  [421 :by 467] ;412 :by 452 with border=5
+    :size  [421 :by 502] ;412 :by 462 with border=5
     :resizable? false
     :on-close :exit
-    :menubar  (make-menubar)
+    :menubar  (make-menubar)                   
     :content  (ssw/border-panel
                :border 10
                :hgap 10
                :vgap 10
-               ;:north  (make-toolbar)
+               :north  (ssw/horizontal-panel :items 
+                       [(ssw/button :text "Undo"  :listen [:action #(ssw/alert "Not implemented!")]) [:fill-h 10] 
+                        (ssw/button :text "Clear" :listen [:action #(clear!)])                       [:fill-h 10]
+                        (ssw/button :text "Available Moves" :listen [:action #(ssw/alert "Not implemented!")]) [:fill-h 10]
+                        (ssw/button :text "Hint" :listen [:action #(ssw/alert "Not implemented!")])  [:fill-h 10]])
                :center canvas
                :south  status-label)))
                
-(defn clear! [] (reset! curr-game nil))
+               
+
 
 (defn show-gui! [game-map] 
-  (do #_(ssw/native!) 
-        (reset! curr-game game-map) ;firstly make the gui aware of what game we want it to display
+  (do  
+        (deliver curr-game game-map) ;firstly make the gui aware of what game we want it to display
         (ssw/invoke-later 
-          (doto (make-arena) ssw/show!))))                            
+          (doto (make-arena) ssw/show!))))
+                                                
                
         
