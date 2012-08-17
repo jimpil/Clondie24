@@ -39,7 +39,7 @@
   (fresh [a b]
   (conde  
     [(= y 6) (== a x) (== b (- y 2))]         ;1st possibility (2 steps)
-    [(<= (- y 1) 0) (== a x) (== b (- y 1))]) ;2nd possibility (1 step)
+    [(>= (- y 1) 0) (== a x) (== b (- y 1))]) ;2nd possibility (1 step)
     (== q [a b])))))))
     
 (defn checker-moves 
@@ -117,7 +117,8 @@
 
 (defn knight-moves 
 "Returns the available moves for a knight (on a 8x8 grid) given its current position." 
- [_ x y _]
+ [m boa x y dir]
+(remove #(collides? [x y] % nil boa m dir)
 (let [xmax 8 ymax 8]
  (run* [q] ;bring back all possible solutions
  (fresh [a b]
@@ -131,7 +132,7 @@
     [(>= (- x 2)   0) (< (+ y 1) ymax) (== a (- x 2)) (== b (+ y 1))] ;7th possibility
     [(>= (- x 1)   0) (< (+ y 2) ymax) (== a (- x 1)) (== b (+ y 2))] ;8th possibility
   ) 
-   (== q [a b]))))) ;return each solution in a vector [x, y]
+   (== q [a b])))))) ;return each solution in a vector [x, y]
 
 
 
