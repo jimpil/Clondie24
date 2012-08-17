@@ -22,6 +22,9 @@
 
 (defn double? [e]
 (if (= (class e) (Class/forName  "java.lang.Double")) true false))
+
+(defn round-to-int [n] 
+(Math/round (float n)))
     
 (defn vector-of-doubles [v]
 (if (every? double? v) v
@@ -136,7 +139,6 @@
     
 (defn inspect-boards [bs] ;the boards
 (map #(inspect-table %) bs))
-
 
 (defn make-walker [dir]
  (fn [[sx sy]] 
