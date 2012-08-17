@@ -50,6 +50,9 @@
 
 (declare make-chessItem, details, start-chess!) ;;will need these
 
+(defn chess-best-move [dir b n] 
+(s/start-search dir b n))
+
 (defn starting-chessItems
 "Will construct a set of initial chess items (16). black? specifies the side of the board where the pieces should be placed (true for north false for south)."
 [black?]
@@ -57,8 +60,7 @@
 (map #(make-chessItem (second (chess-images (keyword %2))) 
       (core/translate-position % board-mappings-chess) :rank %2 :direction 1) (range 16) chessPos->rank)
 (map #(make-chessItem (first (chess-images (keyword %2))) 
-      (core/translate-position % board-mappings-chess) :rank %2 :direction -1) (range 48 64) (reverse chessPos->rank))      
-))
+      (core/translate-position % board-mappings-chess) :rank %2 :direction -1) (range 48 64) (reverse chessPos->rank))))
 
 (def current-chessItems
 "This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
@@ -68,12 +70,12 @@
 (def chess-moves {:pawn     (partial rul/pawn-moves board-mappings-chess) 
                   :rook     (partial rul/rook-moves board-mappings-chess)
                   :bishop   (partial rul/bishop-moves board-mappings-chess) 
-                  :knight   #(rul/knight-moves % %2 %3 %4) ;1st and 4rth args are ignored 
+                  :knight   (partial rul/knight-moves board-mappings-chess) 
                   :queen    (partial rul/queen-moves board-mappings-chess)
                   :king     (partial rul/king-moves board-mappings-chess)})
                                    
 (defn rank->moves 
-"Returns all legal moves of piece p depending on rank of p. Direction d is only required for pawns." 
+"Returns all legal moves of piece p depending on rank of p." 
 [p] 
 (let [[x y] (:position p) 
       r (keyword (:rank p))
@@ -88,8 +90,10 @@
 (defn start-chess! [] 
 "Start a chess-game. Returns the starting-board."
 (do (core/clear-history!) ;empty board-history
+    (deliver s/curr-game details)
     (reset! current-chessItems
-            (core/starting-board details))));mandatory before game starts 
+            (core/starting-board details))
+    ));mandatory before game starts 
                       
 (def details "The map that describes the game of chess."
               {:name 'Chess
@@ -102,6 +106,7 @@
                                    '(  9      5     3       3       1    100))
                :board-atom current-chessItems
                :game-starter start-chess!
+               :hinter chess-best-move 
                :record-name "Clondie24.games.chess.ChessPiece" 
                :mappings board-mappings-chess
                :north-player-start  (starting-chessItems true)    ;opponent
@@ -134,32 +139,17 @@
 (def ^:dynamic white-direction 1)   
 
 
-
+;(deliver s/curr-game details) ;temporary
 ;(defmethod gui/new-game! 'Chess [_] (start-chess!) (reset! s/curr-game details)) ;hook on to the gui and search
 
 
-(defn chess-best-move [dir b n] 
-(s/start-search dir b n))
+
 
 (defn -main 
 "Starts a swing Chess game." 
-[& args]  (gui/show-gui! details))
-
-  
-(comment
-;start the game up
-(let [p (nth @(:board-atom details) 8) ;some random piece
-      m (ChessMove. p (:position p) (first (core/getMoves p)))]  ;some random empty position and the first available move  
-(core/execute m))
- 
-(inspect-boards @(:board-atom details)) ;should have 2 boards (the starting one and the one after the move)
-      
-)      
-      
-      
-
-
-
-
-           
+[& args]  (gui/show-gui! details)
+#_(s/game-tree true 1 (start-chess!) s/next-level 4)
+#(s/start-search 1 (start-chess!) 4)
+)
+         
                
