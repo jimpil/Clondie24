@@ -1,30 +1,29 @@
 (ns Clondie24.lib.search 
       (:require [Clondie24.lib.core :as core]))
       
-(def curr-game "Before any searching we need a game-map." (atom nil))
+(def curr-game "Before any searching we need a game-map." (promise))
 
 (defn game-tree
-  "Generate the entire game tree lazily. For games like chess you MUST consume only a portion of it."
+  "Generate the entire game tree lazily."
   [root? dir board successors-fn depth]
-  (let [mapp (if root? pmap map)]
   {:node board
    :direction dir
-   :children   (if (neg? depth) '()
-               (mapp #(game-tree false %2 %1 successors-fn (dec depth)) 
-               (successors-fn board dir) (cycle [(- dir) dir])))}))
+   :children   (if (zero? depth) '()
+  ((if root? pmap map) #(game-tree false (- dir) % successors-fn (dec depth)) 
+                        (successors-fn board dir)))})
 
     
 (defn search [eval-fn tree]
 (letfn [(minimize [tree]  (if (seq (:children tree))
                                 (apply min
                                   (map #(maximize %) (:children tree)))
-                            (eval-fn (:node tree) (:dir tree))))
+                           (eval-fn (:node tree) (:dir tree))))
 
-        (maximize [tree]  (if (seq (:children tree))
-                                (apply max
+        (maximize [tree] (if (seq (:children tree))
+                                 (apply max
                                   (map #(minimize %) (:children tree)))
                             (eval-fn (:node tree) (:dir tree))))] 
-(minimize tree)))    
+(trampoline minimize tree)))    
     
 
 (defn evaluator
@@ -35,12 +34,12 @@
     (search eval-fn t)))
 
 (defn best-next-state
-  "Get the best computer move for the given game tree.
+  "Get the best next state for the given game tree.
   static-evaluator evaluates single positions, without looking at the tree, and
-  returning a number"
+  returning a number."
   [tree static-evaluator]
   (->> (:children tree)
-       (max-key (evaluator static-evaluator))
+       (apply max-key (evaluator static-evaluator))
        (:node)))
               
                 
@@ -55,22 +54,23 @@
 (defn score-by-count [b dir] 
 (let [hm (filter #(= dir (:direction %)) b)
       aw (filter #(not= dir (:direction %)) b)]
- (- (count hm) (count aw))))      
+ (- (count hm) 
+    (count (remove nil? aw)))))      
  
  
  (defn score-naive [b dir] 
  (let [hm (filter #(= dir (:direction %)) b)
-       aw (filter #(not= dir (:direction %)) b)]
- (- (reduce + (remove nil? (map #(:value %) hm))) 
-    (reduce + (remove nil? (map #(:value %) aw))))))
+       aw (remove nil? (filter #(not= dir (:direction %)) b))]
+ (- (apply + (map #(:value %) hm)) 
+    (apply + (map #(:value %) aw)))))
     
 (defn start-search [dir root-n depth]
 (let [b-state (-> (game-tree true dir root-n next-level depth)
-                  (best-next-state score-by-count))
+                  (best-next-state score-by-count ))
       team    (filter #(= dir (:direction %)) root-n)
-      team-moves (concat (for [piece *1 
+      team-moves (concat (for [piece team 
                                coords (core/getMoves piece)] 
-                         (core/dest->Move curr-game piece coords)))]
+                         (core/dest->Move @curr-game piece coords)))]
 (some #(when (= b-state (core/try-move %)) %) team-moves))) 
 ;the best move is the one that results to the best next state as returned by the recursion   
 
