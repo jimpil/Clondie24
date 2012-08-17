@@ -117,7 +117,7 @@
 
 (defn knight-moves 
 "Returns the available moves for a knight (on a 8x8 grid) given its current position." 
- [_ x y]
+ [_ x y _]
 (let [xmax 8 ymax 8]
  (run* [q] ;bring back all possible solutions
  (fresh [a b]
