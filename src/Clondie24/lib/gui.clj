@@ -5,8 +5,25 @@
 ;-------------------------------------<SOURCE-CODE>--------------------------------------------------------------------
 ;----------------------------------------------------------------------------------------------------------------------    
 (def curr-game (promise)) 
+(defn clear! [] ;NEEDS FIXING
+(-> (:board-atom @curr-game)
+    (reset! (peek (reset! (core/clear-history!))))) )
 
-(defn clear! [] (core/clear-history!))
+(def sel-piece (atom nil)) ;trying to keep mutable state minimum
+
+(defn balance [how]
+(condp = how
+   :up   (partial * 50)
+   :down (comp int #(/ % 50))))
+
+(defn identify-p 
+"Returns the piece that corresponds to the coordinates on this board." 
+[m b cl-coords]
+(let [balancer (balance :down)
+      r-ids (map balancer cl-coords)
+      l-pos (core/translate-position (first r-ids) (second r-ids) m)
+      f-piece (nth b l-pos)]
+(when-not (nil? f-piece) f-piece)))
 
 (declare canvas status-label)
 
@@ -26,6 +43,10 @@
                         :name "Load" 
                         :tip  "Load a game from disk." 
                         :key  "menu L")
+      a-quit (ssw/action :handler (fn [e] (System/exit 0)) 
+                        :name "Quit" 
+                        :tip  "Exit Clondie24" 
+                        :key  "menu Q")                  
       a-pref (ssw/action :handler (fn [e] (ssw/alert "Not implemented!")) 
                         :name "Preferences" 
                         :tip  "Show options" 
@@ -39,7 +60,7 @@
                            :tip  "A few words." 
                            :key  "menu A")]   
 (ssw/menubar :items 
-   [(ssw/menu :text "Game"    :items [a-new a-save a-load])
+   [(ssw/menu :text "Game"    :items [a-new a-save a-load a-quit])
     (ssw/menu :text "Options" :items [a-pref])
     (ssw/menu :text "Help"    :items [a-details a-bout])]) ))
 
@@ -54,7 +75,7 @@
 (defn draw-images [g]
 (let [b  (:board-atom @curr-game) ;nil
       ps (filter (complement nil?) @b) 
-      balancer (partial * 50)]
+      balancer (balance :up)]
   (doseq [p ps]
   (let [[bx by] (vec (map balancer (:position p)));the balanced coords
          pic (:image p)]  ;the actual picture
@@ -75,16 +96,31 @@
  (draw-grid d g) 
  (when (seq @core/board-history) 
                (draw-images g))))
-             
+               
+(defn canva-react [e]
+(let [spot  (vector (.getX e) (.getY e))
+      piece (identify-p (:mappings @curr-game) @(:board-atom @curr-game) spot)]
+(if (nil? @sel-piece) (reset! sel-piece piece) ;if there is no selection
+(when (some #{(vec (map (balance :down) spot))} (core/getMoves @sel-piece))
+ (do (core/execute! 
+     (core/dest->Move @curr-game @sel-piece (vec (map (balance :down) spot))) (:board-atom @curr-game)) 
+     (reset! sel-piece nil) 
+     (ssw/repaint! canvas))))))             
  
 (def canvas
  (ssw/canvas
     :paint draw-tiles
     :id :canvas
+    :listen [:mouse-clicked (fn [e] (canva-react e))]
     ;:background "#222222"; no need for background
     ))
 
 (def status-label (ssw/label :id :status :text "Ready!"))
+
+;(defn highlight-rect [] nil)
+
+(defn hint [] ;NEEDS CHANGING - TESTING ATM
+((:hinter @curr-game) (:direction @sel-piece) @(:board-atom @curr-game) 2))
     
 (defn make-arena 
 "Constructs and returns the entire arena frame" []
@@ -99,18 +135,16 @@
                :hgap 10
                :vgap 10
                :north  (ssw/horizontal-panel :items 
-                       [(ssw/button :text "Undo"  :listen [:action #(ssw/alert "Not implemented!")]) [:fill-h 10] 
-                        (ssw/button :text "Clear" :listen [:action #(clear!)])                       [:fill-h 10]
-                        (ssw/button :text "Available Moves" :listen [:action #(ssw/alert "Not implemented!")]) [:fill-h 10]
-                        (ssw/button :text "Hint" :listen [:action #(ssw/alert "Not implemented!")])  [:fill-h 10]])
+                       [(ssw/button :text "Undo"  :listen [:action (fn [e] (do (core/undo!) (ssw/repaint! canvas)))]) [:fill-h 10] 
+                        (ssw/button :text "Clear" :listen [:action (fn [e] (do (clear!) (ssw/repaint! canvas)))]) [:fill-h 10]
+                        (ssw/button :text "Available Moves" :listen [:action (fn [e] (when-not (nil? @sel-piece) 
+                                                                (ssw/alert (str (vec (core/getMoves @sel-piece))))))]) [:fill-h 10]
+                        (ssw/button :text "Hint" :listen [:action (fn [e] (ssw/alert (str  (hint))))])  [:fill-h 10]])
                :center canvas
                :south  status-label)))
-               
-               
-
-
+                              
 (defn show-gui! [game-map] 
-  (do  
+  (do #_(ssw/native!)
         (deliver curr-game game-map) ;firstly make the gui aware of what game we want it to display
         (ssw/invoke-later 
           (doto (make-arena) ssw/show!))))
