@@ -20,8 +20,7 @@
  (getPoint [this])
  (die [this])
  (promote [this])
- (getMoves [this]) ;pretends there is only this piece on the board - will need filtering for validity later
-) 
+ (getMoves [this])) 
  
  (defprotocol Movable 
  "The Command design pattern in action (allows us to do/undo moves)."
@@ -109,8 +108,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
       x-to-last (- (count history) (if (< 2 levels) (inc levels) 2))]
   (nth history x-to-last)))
 
-(defn undo! [levs]
-(swap! board-history #(vec (drop-last %2 %)) levs))      
+(defn undo! []
+(swap! board-history (comp vec butlast)))     
       
 ;(for [letter "ABCDEFGH" ;strings are seqable
 ;     number (range 1 9)]
@@ -137,12 +136,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defn collides?
 [[sx sy] [ex ey] walker b m dir]
-(loop [[cx cy] [sx sy]
-       [imm-x imm-y] (walker [cx cy])]
-(cond 
-  (and (= ex cx) ;if reached destination there is potential for attack
-       (= ey cy)) (if (not= dir (:direction (get b (translate-position ex ey m)))) false true)
-  (not (nil? (get b (translate-position imm-x imm-y m)))) true 
-:else (recur [imm-x imm-y] (walker [imm-x imm-y])))))                 
+(loop [[imm-x imm-y] (if (nil? walker) [ex ey] (walker [sx sy]))] ;if walker is nil make one big step to the end       
+(cond  
+  (and (= [ex ey] [imm-x imm-y]) ;if reached destination 
+       (not= dir (:direction (get b (translate-position ex ey m))))) false    
+  (not (nil? (get b (translate-position imm-x imm-y m)))) true
+:else (recur (walker [imm-x imm-y])))))                 
 
   
