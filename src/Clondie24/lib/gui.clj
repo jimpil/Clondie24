@@ -1,15 +1,31 @@
 (ns Clondie24.lib.gui
     (:require [Clondie24.lib.util :as ut]
               [Clondie24.lib.core :as core] 
-              [seesaw.core :as ssw]))
+              [seesaw.core :as ssw])
+    (:import  [java.awt AlphaComposite Graphics Graphics2D]
+              [java.awt.event MouseEvent]) )
+              
 ;-------------------------------------<SOURCE-CODE>--------------------------------------------------------------------
 ;----------------------------------------------------------------------------------------------------------------------    
-(def curr-game (promise)) 
-(defn clear! [] ;NEEDS FIXING
-(-> (:board-atom @curr-game)
-    (reset! (peek (reset! (core/clear-history!))))) )
+(def knobs "Various knobs for the gui. Better keep them together."
+(atom {:selection nil
+       :highlighting? false 
+      }))
+      
+(defmacro knob! [k nv]
+`(swap! knobs assoc ~k ~nv))     
 
-(def sel-piece (atom nil)) ;trying to keep mutable state minimum
+(def curr-game (promise))
+
+(defn clear! "Clears everything (history and current board)." [] 
+(->  @curr-game
+     (:board-atom)
+     (reset! (peek (core/clear-history!)))) ) ;(peek []) returns nil
+    
+(defn undo! "Go back a state." []
+(->  @curr-game
+     (:board-atom)
+     (reset! (peek (core/undo!)))))    
 
 (defn balance [how]
 (condp = how
@@ -30,7 +46,7 @@
             
 (defn make-menubar 
 "Constructs and returns the entire menu-bar." []
-(let [a-new (ssw/action  :handler (fn [e] (apply (:game-starter @curr-game) '()) 
+(let [a-new (ssw/action :handler (fn [e]  (apply (:game-starter @curr-game) '()) 
                                           (ssw/config! status-label :text "Game on! White moves first..."))
                         :name (str "New " (:name @curr-game)) 
                         :tip  "Start new game." 
@@ -64,7 +80,7 @@
     (ssw/menu :text "Options" :items [a-pref])
     (ssw/menu :text "Help"    :items [a-details a-bout])]) ))
 
-(defn draw-grid [c g]
+(defn draw-grid [c ^Graphics g]
   (let [w (ssw/width c)
         h (ssw/height c)]
     (doseq [x (range 0 w 50)]
@@ -72,16 +88,29 @@
     (doseq [y (range 0 h 50)]
         (.drawLine g 0 y w y))))
         
-(defn draw-images [g]
-(let [b  (:board-atom @curr-game) ;nil
-      ps (filter (complement nil?) @b) 
+(defn draw-images [^Graphics g]
+(when (seq @core/board-history) 
+(let [b  (:board-atom @curr-game)
+      ps (remove nil? @b) 
       balancer (balance :up)]
   (doseq [p ps]
   (let [[bx by] (vec (map balancer (:position p)));the balanced coords
          pic (:image p)]  ;the actual picture
-    (.drawImage g pic bx by nil))))) ;finally call g.drawImage()        
+    (.drawImage g pic bx by nil)))))) ;finally call g.drawImage() 
+     
+    
+(defn highlight-rects [^Graphics g]
+ (when (and (not (nil? (:selection @knobs))) (:highlighting? @knobs)) 
+ (let [pmvs (core/getMoves (:selection @knobs))
+       balancer (balance :up)]
+   (doseq [m pmvs]
+     (let [[rx ry] (vec (map balancer m))]
+     (.setColor g (ut/predefined-color 'green))
+     (.setComposite ^Graphics2D g (AlphaComposite/getInstance 
+                                   AlphaComposite/SRC_OVER (float 0.5)))
+     (.fillRect g rx ry 50 50))))))           
         
-(defn draw-tiles [d g]
+(defn draw-tiles [d ^Graphics g]
   (let [w (ssw/width d)
         h (ssw/height d)
         tiles (map vector (for [x (range 0 w 50) 
@@ -94,18 +123,27 @@
        (.setColor g c)
        (.fillRect g x y 50 50)) 
  (draw-grid d g) 
- (when (seq @core/board-history) 
-               (draw-images g))))
+ (draw-images g)
+ (highlight-rects g)))
                
-(defn canva-react [e]
+(defn canva-react [^MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e))
       piece (identify-p (:mappings @curr-game) @(:board-atom @curr-game) spot)]
-(if (nil? @sel-piece) (reset! sel-piece piece) ;if there is no selection
-(when (some #{(vec (map (balance :down) spot))} (core/getMoves @sel-piece))
- (do (core/execute! 
-     (core/dest->Move @curr-game @sel-piece (vec (map (balance :down) spot))) (:board-atom @curr-game)) 
-     (reset! sel-piece nil) 
-     (ssw/repaint! canvas))))))             
+(cond 
+  (or
+    (and (nil? (:selection @knobs)) (not (nil? piece)))           
+    (and (not (nil? (:selection @knobs))) (= (:direction piece) (:direction (:selection @knobs))))) 
+         (do (knob! :highlighting? false)  
+             (knob! :selection piece)
+             (ssw/repaint! canvas))
+  (nil? (:selection @knobs)) nil ; if selected piece is nil and lcicked loc is nil then do nothing
+  (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs)))
+   (do (core/execute! 
+       (core/dest->Move @curr-game (:selection @knobs) (vec (map (balance :down) spot))) (:board-atom @curr-game)) 
+       (knob! :selection nil)
+       (knob! :highlighting? false) 
+       (ssw/repaint! canvas)))))
+            
  
 (def canvas
  (ssw/canvas
@@ -117,10 +155,9 @@
 
 (def status-label (ssw/label :id :status :text "Ready!"))
 
-;(defn highlight-rect [] nil)
-
 (defn hint [] ;NEEDS CHANGING - TESTING ATM
-((:hinter @curr-game) (:direction @sel-piece) @(:board-atom @curr-game) 2))
+(when-not (nil? (:selection @knobs))
+((:hinter @curr-game) (:direction (:selection @knobs)) @(:board-atom @curr-game) 2)))
     
 (defn make-arena 
 "Constructs and returns the entire arena frame" []
@@ -135,10 +172,10 @@
                :hgap 10
                :vgap 10
                :north  (ssw/horizontal-panel :items 
-                       [(ssw/button :text "Undo"  :listen [:action (fn [e] (do (core/undo!) (ssw/repaint! canvas)))]) [:fill-h 10] 
+                       [(ssw/button :text "Undo"  :listen [:action (fn [e] (do (undo!) (ssw/repaint! canvas)))]) [:fill-h 10] 
                         (ssw/button :text "Clear" :listen [:action (fn [e] (do (clear!) (ssw/repaint! canvas)))]) [:fill-h 10]
-                        (ssw/button :text "Available Moves" :listen [:action (fn [e] (when-not (nil? @sel-piece) 
-                                                                (ssw/alert (str (vec (core/getMoves @sel-piece))))))]) [:fill-h 10]
+                        (ssw/button :text "Available Moves" :listen [:action (fn [e]  
+                                                            (do (knob! :highlighting? true) (ssw/repaint! canvas)))]) [:fill-h 10]
                         (ssw/button :text "Hint" :listen [:action (fn [e] (ssw/alert (str  (hint))))])  [:fill-h 10]])
                :center canvas
                :south  status-label)))
