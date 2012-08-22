@@ -3,6 +3,23 @@
             
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
+
+(defn with-thread-pool* [num-threads f]
+  (let [pool (java.util.concurrent.Executors/newFixedThreadPool num-threads)]
+    (try (f pool)
+      (finally
+        (when pool (.shutdown pool))))))
+
+(defmacro with-thread-pool [[name num-threads] & body]
+  `(with-thread-pool* ~num-threads (fn [~name] ~@body)))
+
+(defn pmapp [f coll]
+  (with-thread-pool [pool (.. Runtime getRuntime availableProcessors)]
+    (doall
+      (map #(.get %)
+        (.invokeAll pool
+          (map (partial partial f)  coll))))))
+
 (defn record-factory [recordname]
   (let [recordclass ^Class (resolve (symbol recordname))
         max-arg-count (apply max (map #(count (.getParameterTypes %))
@@ -45,7 +62,7 @@
 
 (defn make-image 
 "Returns a buffered-image from the specified file or nil if the file is not there." 
-[path-to-image]
+[^String path-to-image]
 (try 
   (javax.imageio.ImageIO/read (java.io.File. path-to-image))
 (catch java.io.IOException e ;returning nil here is ok for now! 
@@ -88,21 +105,32 @@
 (print-table (:characteristics game);the columns
       (deref (:board-atom game))))  ;the rows
 
-(defn persist-board! 
-"Persists the board b on to the disk using Java serialization. Filename needs no extension - it will be appended (.ser)."
+(defn serialize-board! 
+"Serialize the board b on to the disk using Java serialization. Filename needs no extension - it will be appended (.ser)."
 [b fname]
 (with-open [oout (java.io.ObjectOutputStream. 
                  (java.io.FileOutputStream. (str fname ".ser")))]
                  (.writeObject oout b)))
                 
-(defn unpersist-board 
-"Un-Persists a vector from the disk using Java serialization. Filename needs no extension - it will be appended (.ser)." 
+(defn deserialize-board 
+"Deserializes a vector from the disk using Java serialization. Filename needs no extension - it will be appended (.ser)." 
 ^clojure.lang.PersistentVector [fname]
 (let [^clojure.lang.PersistentVector upb (promise)] ;waiting for the value shortly
   (with-open [oin (java.io.ObjectInputStream. 
                   (java.io.FileInputStream. (str fname ".ser")))] 
                   (deliver upb (.readObject oin)))
-       @upb))                      
+       @upb))
+       
+(defn persist-board 
+"Write the board b on a file f the disk as string." 
+[b f]
+(spit f b))
+
+(defn unpersist-board 
+"Read the file f back on memory. Contents should be a vector." 
+[f]
+(binding [*read-eval* false]
+(read-string (slurp f))))                            
 
          
 (defn old-table-model 
@@ -140,13 +168,13 @@
 (defn inspect-boards [bs] ;the boards
 (map #(inspect-table %) bs))
 
-(defn make-walker [dir]
+(defn make-walker [direction]
  (fn [[sx sy]] 
-   (condp = dir
+   (condp = direction
           :north [sx (dec sy)]
           :south [sx (inc sy)]
-          :east  [(dec sx) sy]
-          :west  [(inc sx) sy]
+          :east  [(inc sx) sy]
+          :west  [(dec sx) sy]
           :north-east [(inc sx) (dec sy)]
           :north-west [(dec sx) (dec sy)]
           :south-east [(inc sx) (inc sy)]
@@ -157,8 +185,8 @@
 (let [dx (- ex sx)
       dy (- ey sy)]
 (cond 
-   (and (pos? dx)  (zero? dy)) :west
-   (and (neg? dx)  (zero? dy)) :east
+   (and (neg? dx)  (zero? dy)) :west
+   (and (pos? dx)  (zero? dy)) :east
    (and (pos? dx)  (pos?  dy)) :south-east
    (and (pos? dx)  (neg?  dy)) :north-east
    (and (zero? dx) (pos? dy))  :south
