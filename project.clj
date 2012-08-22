@@ -3,10 +3,11 @@
   :url "https://github.com/jimpil/Clondie24"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.4.0"]
+  :dependencies [[org.clojure/clojure "1.5.0-master-SNAPSHOT"]
+                 ;[org.clojure/clojure "1.5.0-alpha3"]
                  [org.clojure/core.logic "0.7.5"]
                 ; [midje "1.4.0"] 
-                 [seesaw "1.4.2"]
+                 [seesaw "1.4.2" :exclusions [org.clojure/clojure]]
                  ;[clojure-encog "0.4.1-SNAPSHOT"] ;not needed yet
                  ]
   :dev-dependencies [[midje "1.4.0"]]               
