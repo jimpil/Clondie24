@@ -32,14 +32,22 @@
   (run* [q] 
   (fresh [a b]
   (conde  
-    [(= y 1) (== a x) (== b (+ y 2))] ;1st possibility (2 steps)
-    [(< (+ y 1) ymax) (== a x) (== b (+ y 1))])        ;2nd possibility (1 step)
+     [(= y 1) (= nil (boa (translate-position x (+ y 2) m))) (== a x) (== b (+ y 2))] ;1st possibility (2 steps)
+     [(< (+ y 1) ymax) (= nil (boa (translate-position x (+ y 1) m)))  (== a x) (== b (+ y 1))];2nd possibility (1 step)
+     [(< (+ y 1) ymax) (< (+ x 1) xmax) (!= nil (boa (translate-position (+ x 1) (+ y 1)  m)))
+      (!= dir (:direction (boa (translate-position (+ x 1) (+ y 1)  m)))) (== a (+ x 1)) (== b (+ y 1))] ;kill
+     [(< (+ y 1) ymax) (>= (- x 1) 0)  (!= nil (boa (translate-position (- x 1) (+ y 1)  m))) 
+    (!= dir (:direction (boa (translate-position (- x 1) (+ y 1)  m)))) (== a (- x 1)) (== b (+ y 1))]) ;kill 
     (== q [a b])))
   (run* [q] ;else moving north
   (fresh [a b]
   (conde  
-    [(= y 6) (== a x) (== b (- y 2))]         ;1st possibility (2 steps)
-    [(>= (- y 1) 0) (== a x) (== b (- y 1))]) ;2nd possibility (1 step)
+    [(= y 6) (= nil (boa (translate-position x (- y 2) m))) (== a x) (== b (- y 2))]   ;1st possibility (2 steps)
+    [(>= (- y 1) 0) (= nil (boa (translate-position x (- y 1) m))) (== a x) (== b (- y 1))]  ;2nd possibility (1 step)
+    [(>= (- y 1) 0) (< (+ x 1) xmax) (!= nil (boa (translate-position (+ x 1) (- y 1)  m)))
+     (!= dir (:direction (boa (translate-position (+ x 1) (- y 1)  m)))) (== a (+ x 1)) (== b (- y 1))] ;kill
+    [(>= (- y 1) 0) (>= (- x 1) 0) (!= nil (boa (translate-position (- x 1) (- y 1)  m)))  
+    (!= dir (:direction (boa (translate-position (- x 1) (- y 1)  m)))) (== a (- x 1)) (== b (- y 1))]) ;kill
     (== q [a b])))))))
     
 (defn checker-moves 
@@ -51,30 +59,30 @@
    (fresh [a b] 
     (conde 
      [(< (+ y 1) ymax) (< (+ x 1) xmax) (== a x) (== b y)
-                       (= nil (b (translate-position (+ y 1) (+ x 1) m)))] ;landing pos must be vacant
+                       (= nil (boa (translate-position (+ y 1) (+ x 1) m)))] ;landing pos must be vacant
      [(< (+ y 1) ymax) (<= (- x 1) 0) (== a x) (== b y)
-                       (= nil (b (translate-position (+ y 1) (- x 1) m)))] ;landing pos must be vacant
+                       (= nil (boa (translate-position (+ y 1) (- x 1) m)))] ;landing pos must be vacant
                        
      [(< (+ y 2) ymax) (< (+ x 2) xmax) (== a x) (== b y)  ;attacking
-                       (!= nil (b (translate-position (+ y 1) (+ x 1) m))) ; pos in between must NOT be vacant
-                       (= nil  (b (translate-position (+ y 2) (+ x 2) m)))]     ;landing pos must be vacant
+                       (!= nil (boa (translate-position (+ y 1) (+ x 1) m)))  ; pos in between must NOT be vacant
+                       (= nil  (boa (translate-position (+ y 2) (+ x 2) m)))] ;landing pos must be vacant
      [(<= (- y 2) 0) (<= (- x 2) 0) (== a x) (== b y)  ;attacking
-                       (!= nil (b (translate-position (- y 1) (- x 1) m))) ; pos in between must NOT be vacant
-                       (= nil  (b (translate-position (- y 2) (- x 2) m)))])   ;landing pos must be vacant
+                       (!= nil (boa (translate-position (- y 1) (- x 1) m)))   ; pos in between must NOT be vacant
+                       (= nil  (boa (translate-position (- y 2) (- x 2) m)))]) ;landing pos must be vacant
      (== q [a b])))
   (run* [q] 
    (fresh [a b ] 
     (conde 
      [(<= (- y 1) 0) (< (+ x 1) xmax) (== a x) (== b y) 
-                       (= nil(b (translate-position (- y 1) (+ x 1) m)))]   ;landing pos must be vacant
+                       (= nil(boa (translate-position (- y 1) (+ x 1) m)))]   ;landing pos must be vacant
      [(<= (- y 1) 0) (<= (- x 1) 0) (== a x) (== b y)
-                       (= nil(b (translate-position (- y 1) (- x 1) m)))]   ;landing pos must be vacant
+                       (= nil(boa (translate-position (- y 1) (- x 1) m)))]   ;landing pos must be vacant
      [(<= (- y 2) 0) (< (+ x 2) xmax)  (== a x) (== b y)  ;attacking
-                       (!= nil (b (translate-position (- y 1) (+ x 1) m))) ; pos in between must NOT be vacant
-                       (= nil (b  (translate-position (- y 2) (+ x 2) m)))]    ;landing pos must be vacant                  
+                       (!= nil (boa (translate-position (- y 1) (+ x 1) m))) ; pos in between must NOT be vacant
+                       (= nil (boa  (translate-position (- y 2) (+ x 2) m)))]    ;landing pos must be vacant                  
      [(<= (- y 2) 0) (<= (- x 2) 0) (== a x) (== b y)  ;attacking
-                         (!= nil (b (translate-position (- y 1) (- x 1) m))) ; pos in between must NOT be vacant
-                         (= nil  (b (translate-position (- y 2) (- x 2) m)))])   ;landing pos must be vacant
+                         (!= nil (boa (translate-position (- y 1) (- x 1) m))) ; pos in between must NOT be vacant
+                         (= nil  (boa (translate-position (- y 2) (- x 2) m)))])   ;landing pos must be vacant
      (== q [a b]))))))    
     
 (defn rook-moves 
