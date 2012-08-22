@@ -34,7 +34,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
   (let [grid-loc (get mappings i)] ;will translate from 1d to 2d
     (if-not (nil? grid-loc) grid-loc ;not found 
     (throw (IllegalStateException. (str "NOT a valid list-location:" i))))))
-([x y mappings] ;{:post [(not (== % -1))]} 
+([x y ^clojure.lang.PersistentVector mappings] ;{:post [(not (== % -1))]} 
   (let [list-loc (.indexOf mappings (vector x y))] ;will translate from 2d to 1d
     (if-not (= list-loc -1) list-loc ;not found
     (throw (IllegalStateException. (str "NOT a valid grid-location: [" x ", " y "]")))))))
@@ -42,8 +42,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                     
 (defn make-piece 
 "The central function for creating pieces. A piece is simply a record with 4 keys."
- [game c pos &{:keys [rank direction]
-               :or {rank 'zombie direction 1}}]
+ [game c pos &{:keys [rank direction r-value]
+               :or {rank 'zombie direction 1 r-value 1}}]
  ((ut/record-factory-aux (:record-name game)) c pos rank 
   ((keyword rank) (:rel-values game)) direction  
   {:alive true}   ;pieces are born 'alive'             
@@ -76,7 +76,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn move 
 "The function responsible for moving Pieces. Each piece knows how to move itself. Returns the resulting board without making any state changes. " 
 [game-map p coords] 
-{:pre [(satisfies? Piece p)]}  ;safety comes first
+;{:pre [(satisfies? Piece p)]}  ;safety comes first
 (if  (some #{coords} (:mappings game-map)) ;check that the position exists on the grid
 (let [newPiece (update-position p coords) ;the new piece as a result of moving 
       old-pos  (getListPosition p)
@@ -101,12 +101,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn execute! [^Move m batom]
  (reset! batom (try-move m)))
  
-(defn- undo 
-"Returns the state which results from undoing this many levels. " 
-[levels] 
-(let [history @board-history
-      x-to-last (- (count history) (if (< 2 levels) (inc levels) 2))]
-  (nth history x-to-last)))
+(defn threatens? "Returns true if 2 is threatened by p1." 
+[p2 p1]
+(if (some #{(:position p2)} (getMoves p1)) true false)) 
 
 (defn undo! []
 (swap! board-history (comp vec butlast)))     
@@ -116,8 +113,17 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 ;(format "%c%d" letter number)))
 
 (defn clear-history! []
- (swap! board-history 
-    #(vec (drop (count %) %))))
+ (swap! board-history empty))
+
+(defn gather-team "Returns all the pieces with same direction dir on this board b." 
+[b dir]
+(filter #(= dir (:direction %)) b)) ;all the team-mates (with same direction)
+ 
+(defn team-moves 
+[game b dir]
+(let [team (gather-team b dir) 
+      tmvs (mapcat (fn [p] (map #(dest->Move game p %) (getMoves p))) team)]
+ tmvs)) 
 
 ;EXAMPLEs:
  ;(make-checker    (make-color 'BLUE)  [1 5] :rank 'soldier)
@@ -134,13 +140,22 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn bury-dead [c]
  (filter alive? c))  
 
-(defn collides?
+(defn collides? "Returns true if the move from [sx sy] to [ex ey] collides with any friendly pieces. The move will be walked step by step by the walker fn."
 [[sx sy] [ex ey] walker b m dir]
 (loop [[imm-x imm-y] (if (nil? walker) [ex ey] (walker [sx sy]))] ;if walker is nil make one big step to the end       
 (cond  
-  (and (= [ex ey] [imm-x imm-y]) ;if reached destination 
-       (not= dir (:direction (get b (translate-position ex ey m))))) false    
+  (= [ex ey] [imm-x imm-y]) ;if reached destination 
+       (if (not= dir (:direction (b (translate-position ex ey m)))) false true)    
   (not (nil? (get b (translate-position imm-x imm-y m)))) true
-:else (recur (walker [imm-x imm-y])))))                 
+:else (recur (walker [imm-x imm-y])))))
+
+(defn exposes-king? [move b]
+(let [next-b (try-move move)
+     def-king (filter #(and (= 'king (:rank %)) 
+                            (= (:direction %) (:direction (:p move)))) next-b) ;the king we're defending
+     opp-dir (- (:direction (:p move))) ;negate direction of moving piece to get opponent
+     opp-pieces (gather-team b opp-dir)]
+(every? (partial threatens? def-king) opp-pieces)))
+                 
 
   
