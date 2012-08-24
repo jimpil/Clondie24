@@ -10,6 +10,7 @@
 (def knobs "Various knobs for the gui. Better keep them together."
 (atom {:selection nil
        :highlighting? false 
+       :hinting? false
       }))
       
 (defmacro knob! [k nv]
@@ -41,13 +42,13 @@
       f-piece (nth b l-pos)]
 (when-not (nil? f-piece) f-piece)))
 
-(declare canvas status-label)
+(declare canvas status-label hint)
 
             
 (defn make-menubar 
 "Constructs and returns the entire menu-bar." []
 (let [a-new (ssw/action :handler (fn [e]  (apply (:game-starter @curr-game) '()) 
-                                          (ssw/config! status-label :text "Game on! White moves first..."))
+                                          (ssw/config! status-label :text "Game on! Yellow moves first..."))
                         :name (str "New " (:name @curr-game)) 
                         :tip  "Start new game." 
                         :key  "menu N")                           
@@ -100,8 +101,10 @@
      
     
 (defn highlight-rects [^Graphics g]
- (when (and (not (nil? (:selection @knobs))) (:highlighting? @knobs)) 
- (let [pmvs (core/getMoves (:selection @knobs))
+ (when (and (not (nil? (:selection @knobs))) (or (:hinting? @knobs) 
+                                                 (:highlighting? @knobs))) 
+ (let [pmvs (if (:hinting? @knobs)  (list (get-in (hint) [:move :end-pos]))
+                (core/getMoves (:selection @knobs) @(:board-atom @curr-game)))
        balancer (balance :up)]
    (doseq [m pmvs]
      (let [[rx ry] (vec (map balancer m))]
@@ -127,21 +130,24 @@
  (highlight-rects g)))
                
 (defn canva-react [^MouseEvent e]
-(let [spot  (vector (.getX e) (.getY e))
-      piece (identify-p (:mappings @curr-game) @(:board-atom @curr-game) spot)]
+(let [spot  (vector (.getX e) (.getY e)) ;;(seesaw.mouse/location e)
+      piece (identify-p (:mappings @curr-game) @(:board-atom @curr-game) spot)
+      sel   (:selection @knobs)]
 (cond 
   (or
-    (and (nil? (:selection @knobs)) (not (nil? piece)))           
-    (and (not (nil? (:selection @knobs))) (= (:direction piece) (:direction (:selection @knobs))))) 
-         (do (knob! :highlighting? false)  
+    (and (nil? sel) (not (nil? piece)))           
+    (and (not (nil? sel)) (= (:direction piece) (:direction sel)))) 
+         (do (knob! :highlighting? false)
+             (knob! :hinting? false)   
              (knob! :selection piece)
              (ssw/repaint! canvas))
-  (nil? (:selection @knobs)) nil ; if selected piece is nil and lcicked loc is nil then do nothing
-  (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs)))
+  (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
+  (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) @(:board-atom @curr-game)))
    (do (core/execute! 
-       (core/dest->Move @curr-game (:selection @knobs) (vec (map (balance :down) spot))) (:board-atom @curr-game)) 
+       (core/dest->Move @(:board-atom @curr-game) (:selection @knobs) (vec (map (balance :down) spot))) (:board-atom @curr-game)) 
        (knob! :selection nil)
-       (knob! :highlighting? false) 
+       (knob! :highlighting? false)
+       (knob! :hinting? false)  
        (ssw/repaint! canvas)))))
             
  
@@ -156,8 +162,7 @@
 (def status-label (ssw/label :id :status :text "Ready!"))
 
 (defn hint [] ;NEEDS CHANGING - TESTING ATM
-(when-not (nil? (:selection @knobs))
-((:hinter @curr-game) (:direction (:selection @knobs)) @(:board-atom @curr-game) 2)))
+(apply (:hinter @curr-game) (list (get-in @knobs [:selection :direction]) @(:board-atom @curr-game) 2)))
     
 (defn make-arena 
 "Constructs and returns the entire arena frame" []
@@ -176,7 +181,8 @@
                         (ssw/button :text "Clear" :listen [:action (fn [e] (do (clear!) (ssw/repaint! canvas)))]) [:fill-h 10]
                         (ssw/button :text "Available Moves" :listen [:action (fn [e]  
                                                             (do (knob! :highlighting? true) (ssw/repaint! canvas)))]) [:fill-h 10]
-                        (ssw/button :text "Hint" :listen [:action (fn [e] (ssw/alert (str  (hint))))])  [:fill-h 10]])
+                        (ssw/button :text "Hint" :listen [:action (fn [e] 
+                                                     (do (knob! :hinting? true) (ssw/repaint! canvas)))])  [:fill-h 10]])
                :center canvas
                :south  status-label)))
                               
