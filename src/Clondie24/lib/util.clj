@@ -4,7 +4,7 @@
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
 
-(defn with-thread-pool* [num-threads f]
+(defn- with-thread-pool* [num-threads f]
   (let [pool (java.util.concurrent.Executors/newFixedThreadPool num-threads)]
     (try (f pool)
       (finally
@@ -22,7 +22,7 @@
 
 (defn record-factory [recordname]
   (let [recordclass ^Class (resolve (symbol recordname))
-        max-arg-count (apply max (map #(count (.getParameterTypes %))
+        max-arg-count (apply max (map #(count (.getParameterTypes ^java.lang.reflect.Constructor %))
                                        (.getConstructors recordclass)))
         args (map #(symbol (str "x" %)) (range (- max-arg-count 2)))]
     (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
@@ -31,11 +31,12 @@
 "Same as record-factory but using the auxiliary constructor of records which accepts a meta-data map and 
  a field extension map as extra args. Useful." 
  [recordname]
-  (let [recordclass ^Class (resolve (symbol recordname))
-        max-arg-count (apply max (map #(count (.getParameterTypes %))
+  (let [recordclass ^Class (resolve (symbol recordname)) 
+        max-arg-count (apply max  (map #(count (.getParameterTypes ^java.lang.reflect.Constructor %))
                                        (.getConstructors recordclass)))
         args (map #(symbol (str "x" %)) (range max-arg-count))]
     (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
+    
 
 (defn double? [e]
 (if (= (class e) (Class/forName  "java.lang.Double")) true false))
@@ -168,7 +169,8 @@
 (defn inspect-boards [bs] ;the boards
 (map #(inspect-table %) bs))
 
-(defn make-walker [direction]
+(defn make-walker [direction rank]
+(if (= rank 'knight) nil ;;no walker for knight
  (fn [[sx sy]] 
    (condp = direction
           :north [sx (dec sy)]
@@ -178,7 +180,7 @@
           :north-east [(inc sx) (dec sy)]
           :north-west [(dec sx) (dec sy)]
           :south-east [(inc sx) (inc sy)]
-          :south-west [(dec sx) (inc sy)])))
+          :south-west [(dec sx) (inc sy)]))))
           
 (defn resolve-direction 
 [[sx sy] [ex ey]]
