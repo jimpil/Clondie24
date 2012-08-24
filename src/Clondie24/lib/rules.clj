@@ -10,8 +10,8 @@
 
 (defn bishop-moves 
 "Returns the available moves for a bishop (on a 8x8 grid) given its current position and direction."
-[m boa x y dir]
-(remove #(collides? [x y] % (ut/make-walker (ut/resolve-direction [x y] %)) boa m dir)  
+[x y]
+;(remove #(collides? [x y] % (ut/make-walker (ut/resolve-direction [x y] %)) boa m dir)  
 (run* [q] 
 (fresh [a b] 
   (membero a board) 
@@ -19,36 +19,44 @@
    (!= a x) 
    (!= b y)
     (project [x y a b]
-       (== (Math/abs (- x a)) 
-           (Math/abs (- y b)))   
-   (== q [a b]))))))
+       (== (Math/abs ^long (- x a)) 
+           (Math/abs ^long (- y b)))   
+   (== q [a b])))));)
      
 (defn pawn-moves 
 "Returns the available moves for a pawn (on a 8x8 grid) given its current position and direction." 
 [m boa x y dir]
-(remove #(collides? [x y] % (ut/make-walker (ut/resolve-direction [x y] %)) boa m dir)
  (let [xmax 8 ymax 8]
  (if (pos? dir) ;if moving south
   (run* [q] 
   (fresh [a b]
   (conde  
-     [(= y 1) (= nil (boa (translate-position x (+ y 2) m))) (== a x) (== b (+ y 2))] ;1st possibility (2 steps)
-     [(< (+ y 1) ymax) (= nil (boa (translate-position x (+ y 1) m)))  (== a x) (== b (+ y 1))];2nd possibility (1 step)
-     [(< (+ y 1) ymax) (< (+ x 1) xmax) (!= nil (boa (translate-position (+ x 1) (+ y 1)  m)))
-      (!= dir (:direction (boa (translate-position (+ x 1) (+ y 1)  m)))) (== a (+ x 1)) (== b (+ y 1))] ;kill
-     [(< (+ y 1) ymax) (>= (- x 1) 0)  (!= nil (boa (translate-position (- x 1) (+ y 1)  m))) 
-    (!= dir (:direction (boa (translate-position (- x 1) (+ y 1)  m)))) (== a (- x 1)) (== b (+ y 1))]) ;kill 
+     [(= y 1) (= nil (get boa (try (translate-position x (+ y 2) m) (catch Exception e -1)))) 
+      (== a x) (== b (+ y 2))] ;1st possibility (2 steps)
+     [(< (+ y 1) ymax) (= nil (get boa (try (translate-position x (+ y 1) m) (catch Exception e -1))))  
+      (== a x) (== b (+ y 1))] ;2nd possibility (1 step)
+     [(< (+ y 1) ymax) (< (+ x 1) xmax) (!= nil (get boa (try (translate-position (+ x 1) (+ y 1) m) (catch Exception e -1))))
+      (!= dir (:direction (get boa (try (translate-position (+ x 1) (+ y 1) m) (catch Exception e -1))))) 
+      (== a (+ x 1)) (== b (+ y 1))] ;kill
+     [(< (+ y 1) ymax) (>= (- x 1) 0)  (!= nil (get boa (try (translate-position (- x 1) (+ y 1) m) (catch Exception e -1)))) 
+      (!= dir (:direction (get boa (try (translate-position (- x 1) (+ y 1) m) (catch Exception e -1))))) 
+      (== a (- x 1)) (== b (+ y 1))]) ;kill 
     (== q [a b])))
   (run* [q] ;else moving north
   (fresh [a b]
   (conde  
-    [(= y 6) (= nil (boa (translate-position x (- y 2) m))) (== a x) (== b (- y 2))]   ;1st possibility (2 steps)
-    [(>= (- y 1) 0) (= nil (boa (translate-position x (- y 1) m))) (== a x) (== b (- y 1))]  ;2nd possibility (1 step)
-    [(>= (- y 1) 0) (< (+ x 1) xmax) (!= nil (boa (translate-position (+ x 1) (- y 1)  m)))
-     (!= dir (:direction (boa (translate-position (+ x 1) (- y 1)  m)))) (== a (+ x 1)) (== b (- y 1))] ;kill
-    [(>= (- y 1) 0) (>= (- x 1) 0) (!= nil (boa (translate-position (- x 1) (- y 1)  m)))  
-    (!= dir (:direction (boa (translate-position (- x 1) (- y 1)  m)))) (== a (- x 1)) (== b (- y 1))]) ;kill
-    (== q [a b])))))))
+    [(= y 6) (= nil (get boa (try (translate-position x (- y 2) m) (catch Exception e -1)))) 
+     (== a x) (== b (- y 2))]  ;1st possibility (2 steps)
+    [(>= (- y 1) 0) (= nil (get boa (try (translate-position x (- y 1) m) (catch Exception e -1)))) 
+     (== a x) (== b (- y 1))]  ;2nd possibility (1 step)
+    [(>= (- y 1) 0) (< (+ x 1) xmax) (!= nil (get boa (try (translate-position (+ x 1) (- y 1) m) (catch Exception e -1))))
+     (!= dir (:direction (get boa (try (translate-position (+ x 1) (- y 1) m) (catch Exception e -1)))))
+      (== a (+ x 1)) (== b (- y 1))] ;kill
+    [(>= (- y 1) 0) (>= (- x 1) 0) (!= nil (get boa (try (translate-position (- x 1) (- y 1) m) (catch Exception e -1))))  
+    (!= dir (:direction (get boa (try (translate-position (- x 1) (- y 1) m) (catch Exception e -1))))) 
+    (== a (- x 1)) (== b (- y 1))]) ;kill
+    (== q [a b]))))))
+    
     
 (defn checker-moves 
 "Returns the available moves for a checker (on a 8x8 grid) given its current position."
@@ -87,27 +95,27 @@
     
 (defn rook-moves 
 "Returns the available moves for a rook (on a 8x8 grid) given its current position."
-[m boa x y dir]
-(remove #(collides? [x y] % (ut/make-walker (ut/resolve-direction [x y] %)) boa m dir)
+[x y]
+;(remove #(collides? [x y] % (ut/make-walker (ut/resolve-direction [x y] %)) boa m dir)
  (run* [q]
  (fresh [a b]
  (conde 
   [(membero a board) (!= a x) (== b y)]  ;y is constant
   [(membero b board) (!= b y) (== a x)]) ;x is constant
-  (== q [a b])))))
+  (== q [a b]))));)
   
 (defn queen-moves 
 "Returns the available moves for a queen (on a 8x8 grid) given its current position and direction.
  A quen basically has the moving abilities of a rook combined with a bishop." 
-[m boa x y dir]
-(concat (rook-moves m boa x y dir) 
-        (bishop-moves m boa x y dir))) 
+[x y]
+(concat (rook-moves   x y) 
+        (bishop-moves x y))) 
    
 (defn king-moves 
 "Returns the available moves for a king (on a 8x8 grid) given its current position."
-[m boa x y dir]
+[x y]
 (let [xmax 8 ymax 8]
-(remove #(collides? [x y] % (ut/make-walker (ut/resolve-direction [x y] %)) boa m dir)
+;(remove #(collides? [x y] % (ut/make-walker (ut/resolve-direction [x y] %)) boa m dir)
  (run* [q]
  (fresh [a b]
   (conde 
@@ -120,13 +128,13 @@
     [(< (+ x 1) xmax) (> (- y 1) 0) (== a (+ x 1)) (== b (- y 1))]    ;7th possibility (diagonally)
     [(>= (- x 1) 0) (< (+ y 1) ymax) (== a (- x 1)) (== b (+ y 1))]   ;8th possibility (diagonally)
   ) 
-   (== q [a b])))))) ;return each solution in a vector [x, y]
+   (== q [a b])))));) ;return each solution in a vector [x, y]
 
 
 (defn knight-moves 
 "Returns the available moves for a knight (on a 8x8 grid) given its current position." 
- [m boa x y dir]
-(remove #(collides? [x y] % nil boa m dir)
+ [x y]
+;(remove #(collides? [x y] % nil boa m dir)
 (let [xmax 8 ymax 8]
  (run* [q] ;bring back all possible solutions
  (fresh [a b]
@@ -140,7 +148,7 @@
     [(>= (- x 2)   0) (< (+ y 1) ymax) (== a (- x 2)) (== b (+ y 1))] ;7th possibility
     [(>= (- x 1)   0) (< (+ y 2) ymax) (== a (- x 1)) (== b (+ y 2))] ;8th possibility
   ) 
-   (== q [a b])))))) ;return each solution in a vector [x, y]
+   (== q [a b])))));) ;return each solution in a vector [x, y]
 
 
 
