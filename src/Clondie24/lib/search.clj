@@ -3,18 +3,20 @@
                 [clojure.core.reducers :as r]))
       
 (def curr-game "Before any searching we need a game-map." (promise))
-(declare score-by-count next-level my-max)
+(declare score-by-count score-naive next-level my-max)
 
 (defrecord Tree [root direction children])
 (defrecord Move->Tree [move tree])
 (defrecord Move->Board [move board])
 (defrecord Move-Value  [move value])
 
+(def mmm (atom 0))
+
 (defn best 
-([] Integer/MIN_VALUE)
-([best next] 
+([] nil)
+([best next]
   (if (pos? (compare (:value best) (:value next))) 
-    best next)))  ;(:move best) (:move rest)
+    best next))) ;(:move best) (:move rest)
 	                  
 (defn my-max 
 ([x y] (max x y))
@@ -35,11 +37,11 @@
     
 (defn search "The recursion of min-max algorithm." 
 [eval-fn tree depth]
-(letfn [(minimize [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
-                            (r/reduce my-min      ;(apply min
+(letfn [(minimize ^long [tree d] (if (zero? d) (eval-fn (:root tree) (unchecked-negate (:direction tree)))
+                            (r/reduce my-min 
                                   (r/map #(maximize (:tree %) (dec d)) (:children tree)))))
-        (maximize [tree d] (if(zero? d) (eval-fn (:root tree) (:direction tree))
-                            (r/reduce my-max   ; (apply max
+        (maximize ^long [tree d] (if(zero? d) (eval-fn (:root tree) (unchecked-negate (:direction tree)))
+                            (r/reduce my-max   
                                    (r/map #(minimize (:tree %) (dec d)) (:children tree)))))] 
 (minimize tree depth)))    
     
@@ -48,32 +50,36 @@
   [eval-fn depth]
   (fn [t]
     (search eval-fn t depth)))
-            
-                
-(defn next-level [b dir] 
-  (r/map #(Move->Board. % (core/try-move %)) 
-    (core/team-moves @curr-game b dir)))
+ 
+(definline fscore [b dir]
+`(rand-int  10))
 
-(defn fake [dir b d]
+(defn flevel [b dir]
+(repeat 30 (Move->Board. 'm1 b)))            
+                
+(defn next-level [b ^long dir] 
+ (r/map #(Move->Board. % (core/try-move %)) (core/team-moves b dir)))
+
+(defn fake [^long dir b ^long d]
 (r/fold 1 best best
- (r/map #(Move-Value. (:move %) (search score-by-count (:tree %) d))
+ (r/map #(Move-Value. (:move %) (search score-naive (:tree %) d))
                        (into [] (:children (game-tree dir b next-level))))))
                          
 #_(defn fake2 [dir b d] 
 (r/fold best  (into [] (:children (game-tree dir b next-level)))))
 
-(defn score-by-count [b dir] 
-(let [hm (filter #(= dir (:direction %)) b)
-      aw (filter #(not= dir (:direction %)) b)]
- (- (count hm) 
-    (count (remove nil? aw)))))      
- 
- 
- (defn score-naive [b dir]
- (let [hm (filter #(= dir (:direction %)) b)
-       aw (remove nil? (filter #(not= dir (:direction %)) b))]
- (- (apply + (map #(:value %) hm)) 
-    (apply + (map #(:value %) aw)))))   
+(defn score-by-count  [b dir] 
+(let [ hm (into [] (core/gather-team b dir))
+       aw (into [] (core/gather-team b (unchecked-negate dir)))]
+ (unchecked-subtract (count hm) 
+                     (count aw))))      
+
+
+ (defn score-naive ^long [b dir]
+ (let [hm (core/gather-team b dir)
+       aw (core/gather-team b (unchecked-negate dir))]
+ (unchecked-subtract (r/reduce + (r/map :value hm)) 
+                     (r/reduce + (r/map :value aw)))))   
 
 
                 
