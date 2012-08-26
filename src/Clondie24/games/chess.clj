@@ -157,7 +157,7 @@
                    
 ;---------------------------------------------------------------------------------------------               
 
-(def buffered-moves "Precalculate the logical moves of chess-pieces for better performance. Does not apply to pawn."           
+#_(def buffered-moves "Precalculate the logical moves of chess-pieces for better performance. Does not apply to pawn."           
 (loop [k 0 m (hash-map)]
 (if (= 64 k) m
 (recur (inc k) 
@@ -166,14 +166,15 @@
      (map #(rank->moves (ChessPiece. nil (core/translate-position k board-mappings-chess) % 
                ((keyword %) (:rel-values details)) nil)) 
       ['rook 'knight 'bishop 'queen 'king])))))))
-          
+
+;(ut/persist buffered-moves "performance.cheat") 
+(def buffered-moves (ut/unpersist "performance.cheat"))          
 
 (defn -main 
 "Starts a graphical (swing) Chess game." 
-[& args]  (gui/show-gui! details)
-#_(s/game-tree true 1 (start-chess!) s/next-level 2)
+[& args]  
+(gui/show-gui! details)
 #_(time (s/fake -1 (start-chess! false) 4) #_(println @s/mmm))
-#_(s/test-speed (start-chess! false) -1 4)
 )
 
 
