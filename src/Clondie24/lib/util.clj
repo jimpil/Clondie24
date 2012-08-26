@@ -3,6 +3,7 @@
             
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
+(set! *unchecked-math* true)
 
 (defn- with-thread-pool* [num-threads f]
   (let [pool (java.util.concurrent.Executors/newFixedThreadPool num-threads)]
@@ -39,7 +40,7 @@
     
 
 (defn double? [e]
-(if (= (class e) (Class/forName  "java.lang.Double")) true false))
+(if (= (class e) (Class/forName "java.lang.Double")) true false))
 
 (defn round-to-int [n] 
 (Math/round (float n)))
@@ -57,7 +58,7 @@
 (defn make-point 
 "Helper fn for creting java.awt.Point out of a [x y] coords." 
 ^java.awt.Point [p]
-(let [[x y] (vector-of-doubles p)]
+(let [[x y] p]
 (java.awt.Point. x y)))
 
 
@@ -94,6 +95,12 @@
 (defn piece->point [p] ;needs to be in the gui namespace
  (let [[x y] (.getGridPosition  p)]
  (java.awt.Point. x y))) 
+ 
+ (defn Point->Vec [^java.awt.Point p]
+ (vector (.x p) (.y p)))
+ 
+ (defn Vec->Point [v]
+ (java.awt.Point. (first v) (second v)))
  
 (defn no-nils 
 "Filter out nils from a collection." 
@@ -167,12 +174,10 @@
     (.setVisible true)))
     
 (defn inspect-boards [bs] ;the boards
-(map #(inspect-table %) bs))
+(map inspect-table bs))
 
-(defn make-walker [direction rank]
-(if (= rank 'knight) nil ;;no walker for knight
- (fn [[sx sy]] 
-   (condp = direction
+(defn walk* [direction [sx sy]]
+(condp = direction
           :north [sx (dec sy)]
           :south [sx (inc sy)]
           :east  [(inc sx) sy]
@@ -180,21 +185,28 @@
           :north-east [(inc sx) (dec sy)]
           :north-west [(dec sx) (dec sy)]
           :south-east [(inc sx) (inc sy)]
-          :south-west [(dec sx) (inc sy)]))))
+          :south-west [(dec sx) (inc sy)]))
+
+(def walk (memoize walk*))          
+
+(defn make-walker [direction rank]
+(if (= rank 'knight) nil ;;no walker for knight
+ #(walk direction %)))
+                   
           
-(defn resolve-direction 
-[[sx sy] [ex ey]]
-(let [dx (- ex sx)
-      dy (- ey sy)]
+(definline resolve-direction 
+[sp ep]
+`(let [dx# (- (first ~ep) (first ~sp))
+       dy# (- (second ~ep) (second ~sp))]
 (cond 
-   (and (neg? dx)  (zero? dy)) :west
-   (and (pos? dx)  (zero? dy)) :east
-   (and (pos? dx)  (pos?  dy)) :south-east
-   (and (pos? dx)  (neg?  dy)) :north-east
-   (and (zero? dx) (pos? dy))  :south
-   (and (zero? dx) (neg? dy))  :north
-   (and (neg? dx)  (neg? dy))  :north-west
-   (and (neg? dx)  (pos? dy))  :south-west)))  
+   (and (neg? dx#)  (zero? dy#)) :west
+   (and (pos? dx#)  (zero? dy#)) :east
+   (and (pos? dx#)  (pos?  dy#)) :south-east
+   (and (pos? dx#)  (neg?  dy#)) :north-east
+   (and (zero? dx#) (pos? dy#))  :south
+   (and (zero? dx#) (neg? dy#))  :north
+   (and (neg? dx#)  (neg? dy#))  :north-west
+   (and (neg? dx#)  (pos? dy#))  :south-west)))  
    
-         
+        
     
