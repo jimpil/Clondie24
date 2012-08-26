@@ -3,7 +3,8 @@
               [Clondie24.lib.core :as core] 
               [seesaw.core :as ssw])
     (:import  [java.awt AlphaComposite Graphics Graphics2D]
-              [java.awt.event MouseEvent]) )
+              [java.awt.event MouseEvent]
+              [javax.swing SwingWorker]) )
               
 ;-------------------------------------<SOURCE-CODE>--------------------------------------------------------------------
 ;----------------------------------------------------------------------------------------------------------------------    
@@ -11,6 +12,8 @@
 (atom {:selection nil
        :highlighting? false 
        :hinting? false
+       :busy? false
+       :whose-turn "Yellow"
       }))
       
 (defmacro knob! [k nv]
@@ -18,10 +21,26 @@
 
 (def curr-game (promise))
 
+(definline refresh [m]
+`(doseq [e# ~m]
+ (knob! (first e#) (second e#))))
+
+(definline turn [dir] ;direction of the player who just moved
+`(if (pos? ~dir) "Yellow " "Black "))
+
+(defmacro with-worker "Starts up a background job with busy cursor on c." 
+[c job]
+`(proxy [SwingWorker] []
+ (doInBackground [] (do (ssw/config! ~c :cursor :wait) ~job))
+ (done [] (ssw/config! ~c :cursor :default))))
+
+
 (defn clear! "Clears everything (history and current board)." [] 
+(do (knob! :highlighting? false) 
+      (knob! :hinting? false)
 (->  @curr-game
      (:board-atom)
-     (reset! (peek (core/clear-history!)))) ) ;(peek []) returns nil
+     (reset! (peek (core/clear-history!))))) ) ;(peek []) returns nil
     
 (defn undo! "Go back a state." []
 (->  @curr-game
@@ -39,7 +58,7 @@
 (let [balancer (balance :down)
       r-ids (map balancer cl-coords)
       l-pos (core/translate-position (first r-ids) (second r-ids) m)
-      f-piece (nth b l-pos)]
+      f-piece (get b l-pos)]
 (when-not (nil? f-piece) f-piece)))
 
 (declare canvas status-label hint)
@@ -47,7 +66,7 @@
             
 (defn make-menubar 
 "Constructs and returns the entire menu-bar." []
-(let [a-new (ssw/action :handler (fn [e]  (apply (:game-starter @curr-game) '()) 
+(let [a-new (ssw/action :handler (fn [e]  (apply (:game-starter @curr-game) '(false)) 
                                           (ssw/config! status-label :text "Game on! Yellow moves first..."))
                         :name (str "New " (:name @curr-game)) 
                         :tip  "Start new game." 
@@ -95,7 +114,7 @@
       ps (remove nil? @b) 
       balancer (balance :up)]
   (doseq [p ps]
-  (let [[bx by] (vec (map balancer (:position p)));the balanced coords
+  (let [[bx by] (vec (map balancer (if (vector? (:position p)) (:position p) (ut/Point->Vec (:position p)))));the balanced coords
          pic (:image p)]  ;the actual picture
     (.drawImage g pic bx by nil)))))) ;finally call g.drawImage() 
      
@@ -137,17 +156,19 @@
   (or
     (and (nil? sel) (not (nil? piece)))           
     (and (not (nil? sel)) (= (:direction piece) (:direction sel)))) 
-         (do (knob! :highlighting? false)
-             (knob! :hinting? false)   
-             (knob! :selection piece)
+         (do (refresh {:highlighting? false 
+                       :hinting? false 
+                       :selection piece})
              (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
   (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) @(:board-atom @curr-game)))
    (do (core/execute! 
        (core/dest->Move @(:board-atom @curr-game) (:selection @knobs) (vec (map (balance :down) spot))) (:board-atom @curr-game)) 
-       (knob! :selection nil)
-       (knob! :highlighting? false)
-       (knob! :hinting? false)  
+       (refresh {:whose-turn (turn (get-in @knobs [:selection :direction]))
+                 :highlighting? false
+                 :hinting? false
+                 :selection nil})
+       (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))
        (ssw/repaint! canvas)))))
             
  
@@ -160,12 +181,9 @@
     ))
 
 (def status-label (ssw/label :id :status :text "Ready!"))
-
-(defn hint [] ;NEEDS CHANGING - TESTING ATM
-(apply (:hinter @curr-game) (list (get-in @knobs [:selection :direction]) @(:board-atom @curr-game) 2)))
     
 (defn make-arena 
-"Constructs and returns the entire arena frame" []
+"Constructs and returns the entire arena frame." []
  (ssw/frame
     :title "Clondie24 Arena"
     :size  [421 :by 502] ;412 :by 462 with border=5
@@ -185,8 +203,19 @@
                                                      (do (knob! :hinting? true) (ssw/repaint! canvas)))])  [:fill-h 10]])
                :center canvas
                :south  status-label)))
-                              
-(defn show-gui! [game-map] 
+
+;(def arena (make-arena))               
+               
+(defn hint [] ;NEEDS CHANGING - TESTING ATM
+;(.execute 
+;   (with-job canvas
+(try (ssw/config! (ssw/to-widget canvas) :cursor :wait) 
+     (apply (:hinter @curr-game) 
+          (list (get-in @knobs [:selection :direction]) @(:board-atom @curr-game) 2))
+(finally (ssw/config! (ssw/to-widget canvas) :cursor :default)) ) )         
+ 
+                                                       
+(defn show-gui! "Everything starts from here." [game-map] 
   (do #_(ssw/native!)
         (deliver curr-game game-map) ;firstly make the gui aware of what game we want it to display
         (ssw/invoke-later 
