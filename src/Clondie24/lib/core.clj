@@ -16,9 +16,10 @@
 
 (defprotocol Piece "The Piece abstraction."
  (update-position [this new-position])
+ (mutate-position [this new-position]) ;;optional in case you need mutation
  (getGridPosition [this])
  (getListPosition [this])
- (getPoint [this])
+ (getPoint [this]) ;for gui?
  (die [this])
  (promote [this])
  (getMoves [this b])) 
@@ -26,6 +27,7 @@
  (defprotocol Movable 
  "The Command design pattern in action (allows us to do/undo moves)."
  (try-move [this]) 
+ (undo [this]) ;;optional in case you need mutation
  (getOrigin [this]))
  
 (defn translate
@@ -43,7 +45,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (def translate-position (memoize translate))
                     
 (defn make-piece 
-"Helper function for creating pieces. A piece is simply a record with 4 keys."
+"Helper function for creating pieces. A piece is simply a record with 5 keys. Better not use this directly!"
  [game c pos rank direction] ;&{:keys [rank direction ]
                ;:or {rank 'zombie direction 1 r-value 1}}]
  ((ut/record-factory-aux (:record-name game)) c pos rank 
@@ -89,7 +91,17 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
      (assoc! new-pos newPiece)
      (persistent!)
      #_(populate-board))) ;replace dead-pieces with nils
-#_(throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!")))) 
+#_(throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!"))))
+
+(defn amove 
+"Same as 'move' but fast (expects a mutable array for board). Returns the mutated board." 
+[board p coords]
+(let [old-pos  (getListPosition p)
+      mutPiece (update-position p coords) ;the mutated piece 
+      new-pos  (getListPosition mutPiece)] 
+(do
+     (aset  board old-pos nil) ;^"[LClondie24.games.chess.ChessPiece2;"
+     (aset  board new-pos mutPiece) board)))
 
 (defrecord Move [p mover ^clojure.lang.PersistentVector end-pos]
  Movable
@@ -105,9 +117,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn execute! [^Move m batom]
  (reset! batom (try-move m)))
  
-(definline threatens? "Returns true if 2 is threatened by p1 on board b." 
+(definline threatens? "Returns true if p2 is threatened by p1 on board b." 
 [p2 p1 b]
-`(if (some #{(:position ~p2 ~b)} (getMoves ~p1 ~b)) true false)) 
+`(if (some #{(:position ~p2)} (getMoves ~p1 ~b)) true false)) 
 
 (defn undo! []
 (swap! board-history (comp vec butlast)))     
@@ -129,11 +141,6 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
        tmvs# (r/mapcat (fn [p#] (r/map #(dest->Move ~b p# %) (getMoves p# ~b))) team#)]
  tmvs# ))
 
-;EXAMPLEs:
- ;(make-checker    (make-color 'BLUE)  [1 5] :rank 'soldier)
- ;(make-checker    (make-color 'WHITE) [0 0])   ;rank will default to 'zombie
- ;(make-chessItem  (make-image "bishop-icon.png") [2 3] :rank 'bishop)
-
 (defn vacant? 
  "Checks if a position [x, y] is vacant on the given board and mappings." 
   [m b pos]
@@ -149,17 +156,26 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (loop [[imm-x imm-y] (if (nil? walker) [ex ey] (walker [sx sy]))] ;if walker is nil make one big step to the end       
 (cond  
   (= [ex ey] [imm-x imm-y]) ;if reached destination 
-       (if (not= dir (:direction (b (translate-position ex ey m)))) false true)    
+       (if (not= dir (:direction (get b (translate-position ex ey m)))) false true)    
   (not (nil? (get b (translate-position imm-x imm-y m)))) true
 :else (recur (walker [imm-x imm-y])))))
 
+(defn acollides? "Same as 'collides?' but deals with an array as b - not a vector."
+[[sx sy] [ex ey] walker b m dir]
+(loop [[imm-x imm-y] (if (nil? walker) [ex ey] (walker [sx sy]))] ;if walker is nil make one big step to the end       
+(cond  
+  (= [ex ey] [imm-x imm-y]) ;if reached destination 
+       (if (not= dir (:direction (aget b (translate-position ex ey m)))) false true)    
+  (not (nil? (aget  b (translate-position imm-x imm-y m)))) true
+:else (recur (walker [imm-x imm-y])))))
+
 (defn exposes-king? [move b]
-(let [next-b (try-move move)
-     def-king (filter #(and (= 'king (:rank %)) 
-                            (= (:direction %) (:direction (:p move)))) next-b) ;the king we're defending
-     opp-dir (unchecked-negate (:direction (:p move))) ;negate direction of moving piece to get opponent
+(let [next-b (try-move move)  
+     [def-king] (into [] (r/filter #(and (= 'king (:rank %)) 
+                                         (= (:direction %) (get-in move [:p :direction]))) next-b)) ;the king we're defending
+     opp-dir (unchecked-negate (get-in move [:p :direction])) ;negate direction of moving piece to get opponent
      opp-pieces (gather-team b opp-dir)]
-(every? #(threatens? def-king % b) opp-pieces)))
+(every? #(threatens? def-king % b) (into [] opp-pieces))))
                  
 
   
