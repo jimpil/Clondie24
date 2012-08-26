@@ -129,13 +129,13 @@
                   (deliver upb (.readObject oin)))
        @upb))
        
-(defn persist-board 
-"Write the board b on a file f the disk as string." 
+(defn persist
+"Write the data-structure b on a file f on disk as a string." 
 [b f]
 (spit f b))
 
-(defn unpersist-board 
-"Read the file f back on memory. Contents should be a vector." 
+(defn unpersist
+"Read the file f back on memory. Contents should be a data-structure." 
 [f]
 (binding [*read-eval* false]
 (read-string (slurp f))))                            
