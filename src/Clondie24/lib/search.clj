@@ -13,7 +13,7 @@
 (def mmm (atom 0))
 
 (defn best 
-([] nil)
+([]    nil)
 ([best next]
   (if (pos? (compare (:value best) (:value next))) 
     best next))) ;(:move best) (:move rest)
@@ -37,10 +37,10 @@
     
 (defn search "The recursion of min-max algorithm." 
 [eval-fn tree depth]
-(letfn [(minimize ^long [tree d] (if (zero? d) (eval-fn (:root tree) (unchecked-negate (:direction tree)))
+(letfn [(minimize ^long [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-min 
                                   (r/map #(maximize (:tree %) (dec d)) (:children tree)))))
-        (maximize ^long [tree d] (if(zero? d) (eval-fn (:root tree) (unchecked-negate (:direction tree)))
+        (maximize ^long [tree d] (if(zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-max   
                                    (r/map #(minimize (:tree %) (dec d)) (:children tree)))))] 
 (minimize tree depth)))    
@@ -61,7 +61,7 @@
  (r/map #(Move->Board. % (core/try-move %)) (core/team-moves b dir)))
 
 (defn fake [^long dir b ^long d]
-(r/fold 1 best best
+(r/fold (/ (.. Runtime getRuntime availableProcessors) 2) best best ;2 = best so far
  (r/map #(Move-Value. (:move %) (search score-naive (:tree %) d))
                        (into [] (:children (game-tree dir b next-level))))))
                          
@@ -76,8 +76,8 @@
 
 
  (defn score-naive ^long [b dir]
- (let [hm (core/gather-team b dir)
-       aw (core/gather-team b (unchecked-negate dir))]
+ (let [hm (core/gather-team b (unchecked-negate dir))
+       aw (core/gather-team b dir)]
  (unchecked-subtract (r/reduce + (r/map :value hm)) 
                      (r/reduce + (r/map :value aw)))))   
 
