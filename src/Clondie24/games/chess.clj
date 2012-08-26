@@ -61,22 +61,23 @@
                                    
 (defn rank->moves 
 "Returns all legal moves of piece p depending on rank of p (excluding pawn)." 
-[p] 
-(let [[x y] (:position p) 
+[p]
+(let [pos (:position p)            ;[[x y] (:position p) 
       r (keyword (:rank p))
       d (:direction p)]      
-(apply (r chess-moves) (list x y)))) ;will return a fn which is called with current x and y  
+(apply (r chess-moves) pos))) ;will return a fn which is called with current x and y 
+;(if (= (class p) (Class/forName "Clondie24.games.chess.ChessPiece2"))
+;(ut/Point->Vec pos) pos))))  
                                               
 
-(defn start-chess! [] 
+(defn start-chess! [fast?] 
 "Start a chess-game. Returns the starting-board."
 (do (core/clear-history!) ;empty board-history
     (deliver s/curr-game details)
     (reset! current-chessItems
-            (core/starting-board details))
+  (if fast? (into-array  (core/starting-board details))
+                         (core/starting-board details)))
     ));mandatory before game starts 
-                      
-
                
 ;(def make-chessItem  (partial core/make-piece details))  (->ChessPiece)
 (def vacant-chess-tile? (partial core/vacant? board-mappings-chess))                         
@@ -85,16 +86,19 @@
                        ^clojure.lang.PersistentVector position 
                         rank ^long value direction]
  core/Piece 
- (update-position [this np] (ChessPiece. (:image this) np (:rank this) (:value this) (:direction this)))
+ (update-position [this np] (ChessPiece. image np rank value direction))
  (die [this]     (vary-meta this assoc :alive false)) ;communicate death through meta-data 
- (promote [this] (ChessPiece. (:image this) (:position this) (:rank this) (:value this) (:direction this))) ;a pawn is promoted to a queen
- (getListPosition [this] (core/translate-position (first  position) 
-                                                  (second position) board-mappings-chess))
+ (promote [this] (ChessPiece. image position rank value direction)) ;a pawn is promoted to a queen
+ (getListPosition [this] (core/translate-position (first  position) (second position) board-mappings-chess))
  (getPoint [this] (ut/make-point position))
  (getMoves [this b] (let [[x y] position]
-                  (remove #(core/collides? position % (ut/make-walker 
+               (remove 
+                              ;#(or 
+                              #(core/collides? position % (ut/make-walker 
                                                    (ut/resolve-direction position %) rank) 
-                                                    b board-mappings-chess direction) 
+                                                    b board-mappings-chess direction)
+                               ;(core/exposes-king? (core/dest->Move b this %) b)
+                                
                   (if-not (= rank 'pawn)                                
                     (get-in buffered-moves [(core/translate-position 
                                                   x y board-mappings-chess) (keyword rank)]) ;returns a list of points [x y]
@@ -103,16 +107,37 @@
  (toString [this] 
    (println "ChessItem (" rank ") at position:" (core/getListPosition this) " ->" position)) )
    
+(defrecord ChessPiece2 [^java.awt.Image image 
+                        ^java.awt.Point position 
+                         rank ^long value direction]
+ core/Piece 
+ (update-position [this np] (do (set! (.x position) (first np)) 
+                                (set! (.y position) (second np)) this))
+ (die [this]     (vary-meta this assoc :alive false)) ;communicate death through meta-data 
+ (promote [this] (ChessPiece2. image position rank value direction)) ;a pawn is promoted to a queen
+ (getListPosition [this] (core/translate-position (.x position) (.y position) board-mappings-chess))
+ (getPoint [this] position)
+ (getMoves [this b] (let [[x y] (ut/Point->Vec position)]
+                  (remove #(core/acollides? [x y] % (ut/make-walker  (ut/resolve-direction [x y] %) rank) 
+                                                     b board-mappings-chess direction) 
+                  (if-not (= rank 'pawn)                                
+                    (get-in buffered-moves [(core/translate-position 
+                                                  x y board-mappings-chess) (keyword rank)]) ;returns a list of points [x y]
+                   (apply ((keyword rank) chess-moves) (list (vec b) x y direction))))))  
+ Object
+ (toString [this] 
+   (println "ChessItem (" rank ") at position:" (core/getListPosition this) " = " position)) )   
+   
 (defn starting-chessItems
 "Will construct a set of initial chess items (16). black? specifies the side of the board where the pieces should be placed (true for north false for south)."
 [black?]
 (if black?  
 (map #(ChessPiece. (second (chess-images (keyword %2))) 
       (core/translate-position % board-mappings-chess) %2
-                       ((keyword 2%) rel-values)  1) (range 16) chessPos->rank)
+                       ((keyword %2) rel-values)  1 {:alive true} nil) (range 16) chessPos->rank)
 (map #(ChessPiece. (first (chess-images (keyword %2))) 
       (core/translate-position % board-mappings-chess) %2
-                      ((keyword %2) rel-values)  -1) (range 48 64) (reverse chessPos->rank))))
+                      ((keyword %2) rel-values)  -1 {:alive true} nil) (range 48 64) (reverse chessPos->rank))))
                       
 (def details "The map that describes the game of chess."
               {:name 'Chess
@@ -127,17 +152,13 @@
                :hinter chess-best-move 
                :record-name "Clondie24.games.chess.ChessPiece" ;;fully qualified name
                :mappings board-mappings-chess
-               :north-player-start  (map #(->ChessPiece (second (chess-images (keyword %2))) 
-                                          (core/translate-position % board-mappings-chess) %2
-                                          ((keyword %2) rel-values)  1) (range 16) chessPos->rank) ;opponent (black)
-               :south-player-start  (map #(->ChessPiece (first (chess-images (keyword %2))) 
-                                          (core/translate-position % board-mappings-chess) %2
-                                          ((keyword %2) rel-values)  -1) (range 48 64) (reverse chessPos->rank))}) ;human (white)                      
+               :north-player-start  (starting-chessItems true)   ;opponent (black)
+               :south-player-start  (starting-chessItems false)});human (white or yellow)
                    
 ;---------------------------------------------------------------------------------------------               
 
-(def buffered-moves "Memoize the logical moves of chess-pieces for better performance. Does not apply to pawn."           
-(loop [k 0 m {}]
+(def buffered-moves "Precalculate the logical moves of chess-pieces for better performance. Does not apply to pawn."           
+(loop [k 0 m (hash-map)]
 (if (= 64 k) m
 (recur (inc k) 
  (assoc m k 
@@ -149,10 +170,15 @@
 
 (defn -main 
 "Starts a graphical (swing) Chess game." 
-[& args]  #_(gui/show-gui! details)
+[& args]  (gui/show-gui! details)
 #_(s/game-tree true 1 (start-chess!) s/next-level 2)
-(time (s/fake -1 (start-chess!) 4) #_(println @s/mmm))
-#_(s/test-speed (start-chess!) -1 4)
+#_(time (s/fake -1 (start-chess! false) 4) #_(println @s/mmm))
+#_(s/test-speed (start-chess! false) -1 4)
 )
+
+
+
+
+
          
                
