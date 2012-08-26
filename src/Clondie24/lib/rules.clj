@@ -4,6 +4,8 @@
              clojure.core.logic.arithmetic
             [Clondie24.lib.core :only [translate-position collides?]])
        (:require [Clondie24.lib.util :as ut]))
+       
+(set! *unchecked-math* true)       
              
 (def ^:const board (vec (range 8)))
                            
