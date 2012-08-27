@@ -1,9 +1,11 @@
 (ns Clondie24.lib.search 
       (:require [Clondie24.lib.core :as core]
                 [clojure.core.reducers :as r]))
+
+(set! *unchecked-math* true)                 
       
 (def curr-game "Before any searching we need a game-map." (promise))
-(declare score-by-count score-naive next-level my-max)
+(declare score-by-count score-naive next-level)
 
 (defrecord Tree [root direction children])
 (defrecord Move->Tree [move tree])
@@ -62,7 +64,7 @@
 
 (defn fake [^long dir b ^long d]
 (r/fold (/ (.. Runtime getRuntime availableProcessors) 2) best best ;2 = best so far
- (r/map #(Move-Value. (:move %) (search score-naive (:tree %) d))
+ (r/map #(Move-Value. (:move %) (search score-naive (:tree %) (dec d))) ;searching the children so decrement depth
                        (into [] (:children (game-tree dir b next-level))))))
                          
 #_(defn fake2 [dir b d] 
@@ -76,10 +78,11 @@
 
 
  (defn score-naive ^long [b dir]
- (let [hm (core/gather-team b (unchecked-negate dir))
-       aw (core/gather-team b dir)]
+ (do (swap! mmm inc)
+ (let [hm (core/gather-team b dir) ;fixed bug
+       aw (core/gather-team b (unchecked-negate dir))]
  (unchecked-subtract (r/reduce + (r/map :value hm)) 
-                     (r/reduce + (r/map :value aw)))))   
+                     (r/reduce + (r/map :value aw)))))   )
 
 
                 
