@@ -129,13 +129,13 @@
                   (deliver upb (.readObject oin)))
        @upb))
        
-(defn persist
-"Write the data-structure b on a file f on disk as a string." 
+(defn data->string
+"Writes the data-structure b on a file f on disk as a string." 
 [b f]
 (spit f b))
 
-(defn unpersist
-"Read the file f back on memory. Contents should be a data-structure." 
+(defn string->data
+"Read the file f back on memory. Contents of f should be a clojure data-structure." 
 [f]
 (binding [*read-eval* false]
 (read-string (slurp f))))                            
