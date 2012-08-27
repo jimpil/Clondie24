@@ -86,7 +86,7 @@
                        ^clojure.lang.PersistentVector position 
                         rank ^long value direction]
  core/Piece 
- (update-position [this np] (ChessPiece. image np rank value direction))
+ (update-position [this np] (ChessPiece. image np rank value direction {:alive true} nil))
  (die [this]     (vary-meta this assoc :alive false)) ;communicate death through meta-data 
  (promote [this] (ChessPiece. image position rank value direction)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first  position) (second position) board-mappings-chess))
@@ -167,14 +167,15 @@
                ((keyword %) (:rel-values details)) nil)) 
       ['rook 'knight 'bishop 'queen 'king])))))))
 
-;(ut/persist buffered-moves "performance.cheat") 
-(def buffered-moves (ut/unpersist "performance.cheat"))          
+;(ut/data->string buffered-moves "performance.cheat") 
+(def buffered-moves (ut/string->data "performance.cheat"))  ;it's faster to read them from file than recalculate       
 
 (defn -main 
 "Starts a graphical (swing) Chess game." 
 [& args]  
 (gui/show-gui! details)
-#_(time (s/fake -1 (start-chess! false) 4) #_(println @s/mmm))
+#_(time (s/fake -1 (start-chess! false) 2) #_(println @s/mmm))
+#_(time (do (s/fake -1 (start-chess! false) 4) (println @s/mmm))) 
 )
 
 
