@@ -10,8 +10,8 @@
 
 (defn log-board 
 "The logging function for the board ref. Will conj every new board-state into a vector." 
-[dest k s old n] 
-(when (not= old n) 
+[dest k r old n] 
+ (when (not= n (peek @dest))  
   (swap! dest conj n)))
 
 (defprotocol Piece "The Piece abstraction."
@@ -85,7 +85,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (let [newPiece (update-position p coords) ;the new piece as a result of moving 
       old-pos  (getListPosition p)
       new-pos  (getListPosition newPiece)]            
-(->  board 
+(-> board 
      (transient)  
      (assoc! old-pos nil) 
      (assoc! new-pos newPiece)
@@ -151,14 +151,15 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (definline bury-dead [c]
  `(filter alive? ~c))  
 
-(defn collides? "Returns true if the move from [sx sy] to [ex ey] collides with any friendly pieces. The move will be walked step by step by the walker fn."
-[[sx sy] [ex ey] walker b m dir]
-(loop [[imm-x imm-y] (if (nil? walker) [ex ey] (walker [sx sy]))] ;if walker is nil make one big step to the end       
+(definline collides? 
+"Returns true if the move from sp to ep collides with any friendly pieces. The move will be walked step by step by the walker fn."
+[sp ep walker b m dir]
+`(loop [imm-p# (if (nil? ~walker) ~ep (~walker ~sp))] ;if walker is nil make one big step to the end       
 (cond  
-  (= [ex ey] [imm-x imm-y]) ;if reached destination 
-       (if (not= dir (:direction (get b (translate-position ex ey m)))) false true)    
-  (not (nil? (get b (translate-position imm-x imm-y m)))) true
-:else (recur (walker [imm-x imm-y])))))
+  (= ~ep imm-p#) ;if reached destination 
+       (if (not= ~dir (:direction (get ~b (translate-position (first ~ep) (second ~ep) ~m)))) false true)    
+  (not (nil? (get ~b (translate-position (first imm-p#) (second imm-p#) ~m)))) true
+:else (recur (~walker imm-p#)))))
 
 (defn acollides? "Same as 'collides?' but deals with an array as b - not a vector."
 [[sx sy] [ex ey] walker b m dir]
