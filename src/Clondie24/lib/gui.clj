@@ -8,13 +8,14 @@
               
 ;-------------------------------------<SOURCE-CODE>--------------------------------------------------------------------
 ;----------------------------------------------------------------------------------------------------------------------    
+(def brand-new {:selection nil
+                :highlighting? false 
+                :hinting? false
+                :busy? false
+                :whose-turn "Yellow"})
+
 (def knobs "Various knobs for the gui. Better keep them together."
-(atom {:selection nil
-       :highlighting? false 
-       :hinting? false
-       :busy? false
-       :whose-turn "Yellow"
-      }))
+(atom brand-new))
       
 (defmacro knob! [k nv]
 `(swap! knobs assoc ~k ~nv))     
@@ -24,20 +25,32 @@
 (definline refresh [m]
 `(doseq [e# ~m]
  (knob! (first e#) (second e#))))
+ 
+(defmacro reset-knobs! []
+`(reset! knobs brand-new)) 
 
 (definline turn [dir] ;direction of the player who just moved
 `(if (pos? ~dir) "Yellow " "Black "))
 
-(defmacro with-worker "Starts up a background job with busy cursor on c." 
+(defmacro with-worker 
+"Starts a background worker thread with busy cursor on component c while busy." 
 [c job]
-`(proxy [SwingWorker] []
- (doInBackground [] (do (ssw/config! ~c :cursor :wait) ~job))
- (done [] (ssw/config! ~c :cursor :default))))
-
+`(do (ssw/config! ~c :cursor :wait)
+ (doto (proxy [SwingWorker] []
+       (doInBackground []  ~job)
+       (done [] (ssw/config! ~c :cursor :default)))       
+ (.execute))))
+ 
+(defmacro with-busy-cursor [c job] 
+`(do (ssw/config! ~c :cursor :wait)
+ (future 
+   (try ~job 
+   (finally  (ssw/invoke-later (ssw/config! ~c :cursor :default))))))) 
+      
 
 (defn clear! "Clears everything (history and current board)." [] 
-(do (knob! :highlighting? false) 
-      (knob! :hinting? false)
+(do (refresh {:highlighting? false 
+              :hinting? false})
 (->  @curr-game
      (:board-atom)
      (reset! (peek (core/clear-history!))))) ) ;(peek []) returns nil
@@ -66,8 +79,8 @@
             
 (defn make-menubar 
 "Constructs and returns the entire menu-bar." []
-(let [a-new (ssw/action :handler (fn [e]  (apply (:game-starter @curr-game) '(false)) 
-                                          (ssw/config! status-label :text "Game on! Yellow moves first..."))
+(let [a-new (ssw/action :handler (fn [e] (do (reset-knobs!) (apply (:game-starter @curr-game) '(false)) 
+                                          (ssw/config! status-label :text "Game on! Yellow moves first...")))
                         :name (str "New " (:name @curr-game)) 
                         :tip  "Start new game." 
                         :key  "menu N")                           
@@ -110,8 +123,8 @@
         
 (defn draw-images [^Graphics g]
 (when (seq @core/board-history) 
-(let [b  (:board-atom @curr-game)
-      ps (remove nil? @b) 
+(let [b  (peek @core/board-history) ;(:board-atom @curr-game)
+      ps (remove nil? b) 
       balancer (balance :up)]
   (doseq [p ps]
   (let [[bx by] (vec (map balancer (if (vector? (:position p)) (:position p) (ut/Point->Vec (:position p)))));the balanced coords
@@ -122,8 +135,8 @@
 (defn highlight-rects [^Graphics g]
  (when (and (not (nil? (:selection @knobs))) (or (:hinting? @knobs) 
                                                  (:highlighting? @knobs))) 
- (let [pmvs (if (:hinting? @knobs)  (list (get-in (hint) [:move :end-pos]))
-                (core/getMoves (:selection @knobs) @(:board-atom @curr-game)))
+ (let [pmvs (if (:hinting? @knobs)  (list (get-in (hint 4) [:move :end-pos]))
+                (core/getMoves (:selection @knobs) (peek @core/board-history)))
        balancer (balance :up)]
    (doseq [m pmvs]
      (let [[rx ry] (vec (map balancer m))]
@@ -150,7 +163,7 @@
                
 (defn canva-react [^MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e)) ;;(seesaw.mouse/location e)
-      piece (identify-p (:mappings @curr-game) @(:board-atom @curr-game) spot)
+      piece (identify-p (:mappings @curr-game) (peek @core/board-history) spot)
       sel   (:selection @knobs)]
 (cond 
   (or
@@ -161,9 +174,9 @@
                        :selection piece})
              (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
-  (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) @(:board-atom @curr-game)))
+  (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history)))
    (do (core/execute! 
-       (core/dest->Move @(:board-atom @curr-game) (:selection @knobs) (vec (map (balance :down) spot))) (:board-atom @curr-game)) 
+       (core/dest->Move (peek @core/board-history) (:selection @knobs) (vec (map (balance :down) spot))) (:board-atom @curr-game)) 
        (refresh {:whose-turn (turn (get-in @knobs [:selection :direction]))
                  :highlighting? false
                  :hinting? false
@@ -195,24 +208,36 @@
                :hgap 10
                :vgap 10
                :north  (ssw/horizontal-panel :items 
-                       [(ssw/button :text "Undo"  :listen [:action (fn [e] (do (undo!) (ssw/repaint! canvas)))]) [:fill-h 10] 
-                        (ssw/button :text "Clear" :listen [:action (fn [e] (do (clear!) (ssw/repaint! canvas)))]) [:fill-h 10]
+                       [(ssw/button :text "Undo"  :listen [:action (fn [e] (do (refresh {:highlighting? false 
+                                                                                         :hinting? false}) 
+                                                                               (undo!) (ssw/repaint! canvas)))]) [:fill-h 10] 
+                        (ssw/button :text "Clear" :listen [:action (fn [e] (do (refresh {:highlighting? false 
+                                                                                         :hinting? false}) 
+                                                                               (clear!) (ssw/repaint! canvas)))]) [:fill-h 10]
                         (ssw/button :text "Available Moves" :listen [:action (fn [e]  
-                                                            (do (knob! :highlighting? true) (ssw/repaint! canvas)))]) [:fill-h 10]
+                                                            (do (refresh {:highlighting? true 
+                                                                          :hinting? false}) 
+                                                                (ssw/repaint! canvas)))]) [:fill-h 10]
                         (ssw/button :text "Hint" :listen [:action (fn [e] 
-                                                     (do (knob! :hinting? true) (ssw/repaint! canvas)))])  [:fill-h 10]])
+                                                     (do (refresh {:highlighting? false 
+                                                                   :hinting? true})   
+                                                         (ssw/repaint! canvas)))])  [:fill-h 10]])
                :center canvas
                :south  status-label)))
-
-;(def arena (make-arena))               
+              
                
-(defn hint [] ;NEEDS CHANGING - TESTING ATM
-;(.execute 
-;   (with-job canvas
-(try (ssw/config! (ssw/to-widget canvas) :cursor :wait) 
-     (apply (:hinter @curr-game) 
-          (list (get-in @knobs [:selection :direction]) @(:board-atom @curr-game) 2))
-(finally (ssw/config! (ssw/to-widget canvas) :cursor :default)) ) )         
+(defn hint "Ask for a hint." [depth] 
+(deref 
+ (with-busy-cursor canvas
+  (apply (:hinter @curr-game) 
+          (list (get-in @knobs [:selection :direction]) (peek @core/board-history) depth)))))
+
+
+#_(let [h (future 
+        (apply (:hinter @curr-game) 
+          (list (get-in @knobs [:selection :direction]) @(:board-atom @curr-game) 2)))]
+(try (ssw/config! canvas :cursor :wait)  @h
+(finally (ssw/invoke-later (ssw/config! canvas :cursor :default)))))       
  
                                                        
 (defn show-gui! "Everything starts from here." [game-map] 
