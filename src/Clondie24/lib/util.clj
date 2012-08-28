@@ -28,7 +28,7 @@
         args (map #(symbol (str "x" %)) (range (- max-arg-count 2)))]
     (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
     
-(defn record-factory-aux 
+(defn record-factory-aux* 
 "Same as record-factory but using the auxiliary constructor of records which accepts a meta-data map and 
  a field extension map as extra args. Useful." 
  [recordname]
@@ -37,6 +37,8 @@
                                        (.getConstructors recordclass)))
         args (map #(symbol (str "x" %)) (range max-arg-count))]
     (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
+    
+(def record-factory-aux (memoize record-factory-aux*))    
     
 
 (defn double? [e]
@@ -190,7 +192,7 @@
 (def walk (memoize walk*))          
 
 (defn make-walker [direction rank]
-(if (= rank 'knight) nil ;;no walker for knight
+(if (= rank 'knight) nil ;;knight jumps doesn't walk
  #(walk direction %)))
                    
           
