@@ -79,7 +79,7 @@
                          (core/starting-board details)))
     ));mandatory before game starts 
                
-;(def make-chessItem  (partial core/make-piece details))  (->ChessPiece)
+(def chess-piece  (partial core/piece details))
 (def vacant-chess-tile? (partial core/vacant? board-mappings-chess))                         
 
 (defrecord ChessPiece [^java.awt.Image image 
@@ -91,18 +91,16 @@
  (promote [this] (ChessPiece. image position rank value direction)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first  position) (second position) board-mappings-chess))
  (getPoint [this] (ut/make-point position))
- (getMoves [this b] (let [[x y] position]
-               (remove 
-                              ;#(or 
-                              #(core/collides? position % (ut/make-walker 
-                                                   (ut/resolve-direction position %) rank) 
-                                                    b board-mappings-chess direction)
-                               ;(core/exposes-king? (core/dest->Move b this %) b)
-                                
-                  (if-not (= rank 'pawn)                                
+ (getMoves [this b with-precious?]
+  (let [[x y] position]
+    (core/remove-illegal #(or 
+                             (core/collides? (core/dest->Move b this %) 
+                                 (ut/make-walker 
+                                 (ut/resolve-direction position %) rank) b board-mappings-chess)
+                            (core/exposes? (core/dest->Move b this %) (if with-precious? 'king nil)))    
+                  (if (= rank 'pawn) (apply ((keyword rank) chess-moves) (list b x y direction))                               
                     (get-in buffered-moves [(core/translate-position 
-                                                  x y board-mappings-chess) (keyword rank)]) ;returns a list of points [x y]
-                   (apply ((keyword rank) chess-moves) (list b x y direction))))))  
+                                                  x y board-mappings-chess) (keyword rank)]))))) ;returns a list of points [x y]
  Object
  (toString [this] 
    (println "ChessItem (" rank ") at position:" (core/getListPosition this) " ->" position)) )
@@ -117,7 +115,7 @@
  (promote [this] (ChessPiece2. image position rank value direction)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (.x position) (.y position) board-mappings-chess))
  (getPoint [this] position)
- (getMoves [this b] (let [[x y] (ut/Point->Vec position)]
+ (getMoves [this b safe?] (let [[x y] (ut/Point->Vec position)]
                   (remove #(core/acollides? [x y] % (ut/make-walker  (ut/resolve-direction [x y] %) rank) 
                                                      b board-mappings-chess direction) 
                   (if-not (= rank 'pawn)                                
@@ -157,7 +155,8 @@
                    
 ;---------------------------------------------------------------------------------------------               
 
-#_(def buffered-moves "Precalculate the logical moves of chess-pieces for better performance. Does not apply to pawn."           
+#_(def buffered-moves 
+"Precalculate the logical moves of chess-pieces for better performance. Does not apply to pawn."           
 (loop [k 0 m (hash-map)]
 (if (= 64 k) m
 (recur (inc k) 
@@ -174,7 +173,7 @@
 "Starts a graphical (swing) Chess game." 
 [& args]  
 (gui/show-gui! details)
-#_(time (s/fake -1 (start-chess! false) 2) #_(println @s/mmm))
+#_(time (s/fake -1 (start-chess! false) 4) #_(println @s/mmm))
 #_(time (do (s/fake -1 (start-chess! false) 4) (println @s/mmm))) 
 )
 
