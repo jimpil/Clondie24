@@ -3,6 +3,7 @@
              [clojure.core.reducers :as r :only [map filter]]))
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------   
+(set! *unchecked-math* true)
 
 (def board-history 
 "Log of the state of a game." 
@@ -22,7 +23,7 @@
  (getPoint [this]) ;for gui?
  (die [this])
  (promote [this])
- (getMoves [this b])) 
+ (getMoves [this board with-precious-piece?])) 
  
  (defprotocol Movable 
  "The Command design pattern in action (allows us to do/undo moves)."
@@ -44,7 +45,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (def translate-position (memoize translate))
                     
-(defn make-piece 
+(defn piece 
 "Helper function for creating pieces. A piece is simply a record with 5 keys. Better not use this directly!"
  [game c pos rank direction] ;&{:keys [rank direction ]
                ;:or {rank 'zombie direction 1 r-value 1}}]
@@ -117,9 +118,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn execute! [^Move m batom]
  (reset! batom (try-move m)))
  
-(definline threatens? "Returns true if p2 is threatened by p1 on board b." 
+(definline threatens? "Returns true if p2 is threatened by p1 on board b. This is the only time that we call getMoves with nil." 
 [p2 p1 b]
-`(if (some #{(:position ~p2)} (getMoves ~p1 ~b)) true false)) 
+`(some #{(:position ~p2)} (getMoves ~p1 ~b false)))
 
 (defn undo! []
 (swap! board-history (comp vec butlast)))     
@@ -131,15 +132,17 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn clear-history! []
  (swap! board-history empty)) 
 
-(definline gather-team "Returns all the pieces with same direction dir on this board b." 
+(definline gather-team "Filters all the pieces with same direction dir on this board b. Returns a reducer." 
 [b dir]
 `(r/filter #(= ~dir (:direction %)) ~b)) ;all the team-mates (with same direction)
+
  
-(definline team-moves 
+(definline team-moves "Filters all the moves for the team with direction 'dir' on this board b. Returns a reducer." 
 [b dir]
 `(let [team# (gather-team ~b ~dir) 
-       tmvs# (r/mapcat (fn [p#] (r/map #(dest->Move ~b p# %) (getMoves p# ~b))) team#)]
+       tmvs# (r/mapcat (fn [p#] (r/map #(dest->Move ~b p# %) (getMoves p# ~b true))) team#)]
  tmvs# ))
+
 
 (defn vacant? 
  "Checks if a position [x, y] is vacant on the given board and mappings." 
@@ -152,14 +155,18 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  `(filter alive? ~c))  
 
 (definline collides? 
-"Returns true if the move from sp to ep collides with any friendly pieces. The move will be walked step by step by the walker fn."
-[sp ep walker b m dir]
-`(loop [imm-p# (if (nil? ~walker) ~ep (~walker ~sp))] ;if walker is nil make one big step to the end       
+"Returns true if the move collides with any friendly pieces. 
+ The move will be walked step by step by the walker fn."
+[move walker b m] ;last 2 can be false, nil
+`(let [ep#  (:end-pos ~move)
+       dir# (get-in ~move [:p :direction])]                                         
+(loop [imm-p# (if (nil? ~walker) ep# (~walker (getOrigin ~move)))] ;if walker is nil make one big step to the end       
 (cond  
-  (= ~ep imm-p#) ;if reached destination 
-       (if (not= ~dir (:direction (get ~b (translate-position (first ~ep) (second ~ep) ~m)))) false true)    
+  (=  imm-p# ep#) ;if reached destination there is potential for attack
+       (if (not= dir# (:direction (get ~b (translate-position (first  ep#) 
+                                                              (second ep#) ~m)))) false true)    
   (not (nil? (get ~b (translate-position (first imm-p#) (second imm-p#) ~m)))) true
-:else (recur (~walker imm-p#)))))
+:else (recur (~walker imm-p#))))))
 
 (defn acollides? "Same as 'collides?' but deals with an array as b - not a vector."
 [[sx sy] [ex ey] walker b m dir]
@@ -170,13 +177,24 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
   (not (nil? (aget  b (translate-position imm-x imm-y m)))) true
 :else (recur (walker [imm-x imm-y])))))
 
-(defn exposes-king? [move b]
-(let [next-b (try-move move)  
-     [def-king] (into [] (r/filter #(and (= 'king (:rank %)) 
-                                         (= (:direction %) (get-in move [:p :direction]))) next-b)) ;the king we're defending
-     opp-dir (unchecked-negate (get-in move [:p :direction])) ;negate direction of moving piece to get opponent
-     opp-pieces (gather-team b opp-dir)]
-(every? #(threatens? def-king % b) (into [] opp-pieces))))
+(definline exposes? [move precious]
+`(if-not ~precious false
+ (let [next-b# (try-move ~move)
+       dir# (get-in ~move [:p :direction])
+       def-prec#  (some #(when (and (= ~precious (:rank %)) 
+                                    (= dir# (:direction %))) %) next-b#)]
+(loop [opp-t#  (into [] (gather-team next-b# (unchecked-negate dir#)))]
+(if-not (seq opp-t#) false
+ (if (threatens? def-prec# (first opp-t#) next-b#) true
+(recur (rest opp-t#))))))))
+
+
+#_(some #(threatens? def-prec# % next-b#) 
+   (into [] (gather-team next-b# (unchecked-negate dir#))))
+   
+
+(definline remove-illegal [pred ms]
+`(into [] (r/remove ~pred ~ms)))
                  
 
   
