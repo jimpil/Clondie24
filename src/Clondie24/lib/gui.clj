@@ -135,8 +135,8 @@
 (defn highlight-rects [^Graphics g]
  (when (and (not (nil? (:selection @knobs))) (or (:hinting? @knobs) 
                                                  (:highlighting? @knobs))) 
- (let [pmvs (if (:hinting? @knobs)  (list (get-in (hint 4) [:move :end-pos]))
-                (core/getMoves (:selection @knobs) (peek @core/board-history)))
+ (let [pmvs (if (:hinting? @knobs)  (list (get-in (hint 2) [:move :end-pos]))
+                (core/getMoves (:selection @knobs) (peek @core/board-history) true))
        balancer (balance :up)]
    (doseq [m pmvs]
      (let [[rx ry] (vec (map balancer m))]
@@ -174,7 +174,7 @@
                        :selection piece})
              (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
-  (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history)))
+  (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history) true))
    (do (core/execute! 
        (core/dest->Move (peek @core/board-history) (:selection @knobs) (vec (map (balance :down) spot))) (:board-atom @curr-game)) 
        (refresh {:whose-turn (turn (get-in @knobs [:selection :direction]))
