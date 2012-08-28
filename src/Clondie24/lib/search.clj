@@ -64,7 +64,7 @@
 
 (defn fake [^long dir b ^long d]
 (r/fold (/ (.. Runtime getRuntime availableProcessors) 2) best best ;2 = best so far
- (r/map #(Move-Value. (:move %) (search score-naive (:tree %) (dec d))) ;searching the children so decrement depth
+ (r/map #(Move-Value. (:move %) (search score-naive (:tree %) (dec d))) ;starting from children so decrement depth
                        (into [] (:children (game-tree dir b next-level))))))
                          
 #_(defn fake2 [dir b d] 
