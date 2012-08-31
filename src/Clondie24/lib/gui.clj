@@ -1,7 +1,8 @@
 (ns Clondie24.lib.gui
     (:require [Clondie24.lib.util :as ut]
               [Clondie24.lib.core :as core] 
-              [seesaw.core :as ssw])
+              [seesaw.core :as ssw]
+              [seesaw.chooser :as choo])
     (:import  [java.awt AlphaComposite Graphics Graphics2D]
               [java.awt.event MouseEvent]
               [javax.swing SwingWorker]) )
@@ -9,9 +10,12 @@
 ;-------------------------------------<SOURCE-CODE>--------------------------------------------------------------------
 ;----------------------------------------------------------------------------------------------------------------------    
 (def brand-new {:selection nil
-                :highlighting? false 
-                :hinting? false
-                :busy? false
+                :highlighting? false
+                :busy? false 
+                :hint nil
+                :aux1 nil
+                :aux2 nil
+                :aux3 nil
                 :whose-turn "Yellow"})
 
 (def knobs "Various knobs for the gui. Better keep them together."
@@ -33,27 +37,34 @@
 `(if (pos? ~dir) "Yellow " "Black "))
 
 (defmacro with-worker 
-"Starts a background worker thread with busy cursor on component c while busy." 
-[c job]
+"Starts a background worker thread with busy cursor on component c while busy. 
+ When no storage is provided you must call .get on the result to get the value of 'job' (if it returns anything)." 
+[c job storage]
 `(do (ssw/config! ~c :cursor :wait)
  (doto (proxy [SwingWorker] []
-       (doInBackground []  ~job)
-       (done [] (ssw/config! ~c :cursor :default)))       
+       (doInBackground [] (if (nil? ~storage) ~job 
+                              (knob! ~storage ~job)))
+       (done [] (ssw/repaint! ~c) 
+                (ssw/config! ~c :cursor :default)))       
  (.execute))))
  
-(defmacro with-busy-cursor [c job] 
+(defmacro with-busy-cursor 
+"Starts a future to execute a job with busy cursor whilst busy, on component c. 
+ Optionally if we want a result back we need to provide a place to save it.
+ 3 auxilliary slots are provided in knobs in case you need some."
+ [c job storage-key] 
 `(do (ssw/config! ~c :cursor :wait)
- (future 
-   (try ~job 
-   (finally  (ssw/invoke-later (ssw/config! ~c :cursor :default))))))) 
+  (future (if (nil? ~storage-key) ~job
+  (do (knob! ~storage-key ~job) 
+      (ssw/invoke-later (ssw/repaint! ~c) 
+                        (ssw/config! ~c :cursor :default)))))))
       
 
 (defn clear! "Clears everything (history and current board)." [] 
-(do (refresh {:highlighting? false 
-              :hinting? false})
+(do (reset-knobs!)
 (->  @curr-game
      (:board-atom)
-     (reset! (peek (core/clear-history!))))) ) ;(peek []) returns nil
+     (reset! (peek (core/clear-history!))))) ) ;(peek []) = nil
     
 (defn undo! "Go back a state." []
 (->  @curr-game
@@ -84,11 +95,15 @@
                         :name (str "New " (:name @curr-game)) 
                         :tip  "Start new game." 
                         :key  "menu N")                           
-      a-save (ssw/action :handler (fn [e] (ssw/alert "Not implemented!")) 
+      a-save (ssw/action :handler (fn [e] (choo/choose-file :type :save
+                                                            :filters [["Clojure-data" ["clo"]]] ;;use the reader for now
+                                                            :success-fn (fn [_ f] (ut/data->string @core/board-history f))))
+      
                         :name "Save" 
                         :tip "Save a game to disk." 
                         :key "menu S")
-      a-load (ssw/action :handler (fn [e] (ssw/alert "Not implemented!")) 
+      a-load (ssw/action :handler (fn [e]  (when-let [f (choo/choose-file :filters [["Clojure-data" ["clo"]]])]  
+                                           (reset! core/board-history (ut/string->data f))));;use the reader for now
                         :name "Load" 
                         :tip  "Load a game from disk." 
                         :key  "menu L")
@@ -133,9 +148,9 @@
      
     
 (defn highlight-rects [^Graphics g]
- (when (and (not (nil? (:selection @knobs))) (or (:hinting? @knobs) 
+ (when (and (not (nil? (:selection @knobs))) (or (:hint @knobs) 
                                                  (:highlighting? @knobs))) 
- (let [pmvs (if (:hinting? @knobs)  (list (get-in (hint 2) [:move :end-pos]))
+ (let [pmvs (if-let [h (:hint @knobs)] (list (get-in h [:move :end-pos])) 
                 (core/getMoves (:selection @knobs) (peek @core/board-history) true))
        balancer (balance :up)]
    (doseq [m pmvs]
@@ -170,26 +185,30 @@
     (and (nil? sel) (not (nil? piece)))           
     (and (not (nil? sel)) (= (:direction piece) (:direction sel)))) 
          (do (refresh {:highlighting? false 
-                       :hinting? false 
+                       :hint nil
                        :selection piece})
              (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
   (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history) true))
    (do (core/execute! 
-       (core/dest->Move (peek @core/board-history) (:selection @knobs) (vec (map (balance :down) spot))) (:board-atom @curr-game)) 
+       (core/dest->Move (peek @core/board-history) 
+                        (:selection @knobs) 
+                        (vec (map (balance :down) spot))
+                        (:mover @curr-game)) (:board-atom @curr-game)) 
        (refresh {:whose-turn (turn (get-in @knobs [:selection :direction]))
                  :highlighting? false
-                 :hinting? false
+                 :hint nil
                  :selection nil})
        (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))
        (ssw/repaint! canvas)))))
             
  
-(def canvas
+(defonce canvas
  (ssw/canvas
     :paint draw-tiles
     :id :canvas
-    :listen [:mouse-clicked (fn [e] (canva-react e))]
+    :listen [:mouse-clicked (fn [e] (when-not (:busy? @knobs) 
+                                              (canva-react e)))]
     ;:background "#222222"; no need for background
     ))
 
@@ -208,36 +227,33 @@
                :hgap 10
                :vgap 10
                :north  (ssw/horizontal-panel :items 
-                       [(ssw/button :text "Undo"  :listen [:action (fn [e] (do (refresh {:highlighting? false 
-                                                                                         :hinting? false}) 
-                                                                               (undo!) (ssw/repaint! canvas)))]) [:fill-h 10] 
-                        (ssw/button :text "Clear" :listen [:action (fn [e] (do (refresh {:highlighting? false 
-                                                                                         :hinting? false}) 
-                                                                               (clear!) (ssw/repaint! canvas)))]) [:fill-h 10]
-                        (ssw/button :text "Available Moves" :listen [:action (fn [e]  
+                       [(ssw/button :text "Undo"  :listen [:action (fn [e] (when-not (:busy? @knobs) 
+                                                                           (do (refresh {:highlighting? false 
+                                                                                         :hint nil}) 
+                                                                               (undo!) (ssw/repaint! canvas))))]) [:fill-h 10] 
+                        (ssw/button :text "Clear" :listen [:action (fn [e] (when-not (:busy? @knobs)
+                                                                           (do (refresh {:highlighting? false 
+                                                                                         :hint nil}) 
+                                                                               (clear!) (ssw/repaint! canvas))))]) [:fill-h 10]
+                        (ssw/button :text "Available Moves" :listen [:action (fn [e] (when-not (:busy? @knobs) 
                                                             (do (refresh {:highlighting? true 
-                                                                          :hinting? false}) 
-                                                                (ssw/repaint! canvas)))]) [:fill-h 10]
-                        (ssw/button :text "Hint" :listen [:action (fn [e] 
-                                                     (do (refresh {:highlighting? false 
-                                                                   :hinting? true})   
-                                                         (ssw/repaint! canvas)))])  [:fill-h 10]])
+                                                                          :hint nil}) 
+                                                                (ssw/repaint! canvas))))]) [:fill-h 10]
+                        (ssw/button :text "Hint" :listen [:action (fn [e] (when-not (:busy? @knobs)
+                                                     (do (refresh {:highlighting? false}) 
+                                                         (with-busy-cursor canvas 
+                                                          (hint (:pref-depth @curr-game)) :hint))))]) [:fill-h 10]])
                :center canvas
                :south  status-label)))
               
                
-(defn hint "Ask for a hint." [depth] 
-(deref 
- (with-busy-cursor canvas
-  (apply (:hinter @curr-game) 
+(defn hint "Ask the computer for a hint." 
+[depth] 
+(when-not (:busy? @knobs) ;ONLY IF NOT 'THINKING'
+(do (refresh {:busy? true}) 
+ (apply (:hinter @curr-game) 
           (list (get-in @knobs [:selection :direction]) (peek @core/board-history) depth)))))
-
-
-#_(let [h (future 
-        (apply (:hinter @curr-game) 
-          (list (get-in @knobs [:selection :direction]) @(:board-atom @curr-game) 2)))]
-(try (ssw/config! canvas :cursor :wait)  @h
-(finally (ssw/invoke-later (ssw/config! canvas :cursor :default)))))       
+      
  
                                                        
 (defn show-gui! "Everything starts from here." [game-map] 
