@@ -60,29 +60,18 @@
 (repeat 30 (Move->Board. 'm1 b)))            
                 
 (defn next-level [b ^long dir] 
- (r/map #(Move->Board. % (core/try-move %)) (core/team-moves b dir)))
+ (r/map #(Move->Board. % (core/try-move %)) (core/team-moves b dir (:mover @curr-game))))
 
 (defn fake [^long dir b ^long d]
 (r/fold (/ (.. Runtime getRuntime availableProcessors) 2) best best ;2 = best so far
- (r/map #(Move-Value. (:move %) (search score-naive (:tree %) (dec d))) ;starting from children so decrement depth
+ (r/map #(Move-Value. (:move %) (search (:scorer @curr-game) (:tree %) (dec d))) ;starting from children so decrement depth
                        (into [] (:children (game-tree dir b next-level))))))
                          
 #_(defn fake2 [dir b d] 
-(r/fold best  (into [] (:children (game-tree dir b next-level)))))
-
-(defn score-by-count  [b dir] 
-(let [ hm (into [] (core/gather-team b dir))
-       aw (into [] (core/gather-team b (unchecked-negate dir)))]
- (unchecked-subtract (count hm) 
-                     (count aw))))      
+(r/fold best  (into [] (:children (game-tree dir b next-level)))))    
 
 
- (defn score-naive ^long [b dir]
- (do (swap! mmm inc)
- (let [hm (core/gather-team b dir) ;fixed bug
-       aw (core/gather-team b (unchecked-negate dir))]
- (unchecked-subtract (r/reduce + (r/map :value hm)) 
-                     (r/reduce + (r/map :value aw)))))   )
+ 
 
 
                 
