@@ -28,7 +28,7 @@
         args (map #(symbol (str "x" %)) (range (- max-arg-count 2)))]
     (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
     
-(defn record-factory-aux* 
+(defn record-factory-aux 
 "Same as record-factory but using the auxiliary constructor of records which accepts a meta-data map and 
  a field extension map as extra args. Useful." 
  [recordname]
@@ -36,9 +36,7 @@
         max-arg-count (apply max  (map #(count (.getParameterTypes ^java.lang.reflect.Constructor %))
                                        (.getConstructors recordclass)))
         args (map #(symbol (str "x" %)) (range max-arg-count))]
-    (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
-    
-(def record-factory-aux (memoize record-factory-aux*))    
+    (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))   
     
 
 (defn double? [e]
