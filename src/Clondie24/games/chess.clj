@@ -9,32 +9,27 @@
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
 
-(def ^:const board-mappings-chess
-"A vector of vectors. Outer vector represents the 64 (serial) positions chess-items can position themselves on. 
- Each inner vector represents the coordinates of that position on the 8x8 grid."
-[[0 0] [1 0] [2 0] [3 0] [4 0] [5 0] [6 0] [7 0]
- [0 1] [1 1] [2 1] [3 1] [4 1] [5 1] [6 1] [7 1]
- [0 2] [1 2] [2 2] [3 2] [4 2] [5 2] [6 2] [7 2]
- [0 3] [1 3] [2 3] [3 3] [4 3] [5 3] [6 3] [7 3]
- [0 4] [1 4] [2 4] [3 4] [4 4] [5 4] [6 4] [7 4]
- [0 5] [1 5] [2 5] [3 5] [4 5] [5 5] [6 5] [7 5]
- [0 6] [1 6] [2 6] [3 6] [4 6] [5 6] [6 6] [7 6]
- [0 7] [1 7] [2 7] [3 7] [4 7] [5 7] [6 7] [7 7]])
+(def board-mappings-chess core/mappings-8x8)
+
 
 (def chess-images "All the chess images paired up according to rank."
 (zipmap '(:queen :rook :knight :bishop :pawn :king)
-                     [[(ut/make-image "images/50px/png/Yellow Q.png")
-                       (ut/make-image "images/50px/png/Black Q.png")]
-                      [(ut/make-image "images/50px/png/Yellow R.png")
-                       (ut/make-image "images/50px/png/Black R.png")]
-                      [(ut/make-image "images/50px/png/Yellow N.png")
-                       (ut/make-image "images/50px/png/Black N.png")]
-                      [(ut/make-image "images/50px/png/Yellow B.png")
-                       (ut/make-image "images/50px/png/Black B.png")]
-                      [(ut/make-image "images/50px/png/Yellow P.png")
-                       (ut/make-image "images/50px/png/Black P.png")]
-                      [(ut/make-image "images/50px/png/Yellow K.png")
-                       (ut/make-image "images/50px/png/Black K.png")]]))
+                     [{-1 (ut/make-image "images/50px/png/Yellow Q.png")
+                        1 (ut/make-image "images/50px/png/Black Q.png")}
+                      {-1 (ut/make-image "images/50px/png/Yellow R.png")
+                        1 (ut/make-image "images/50px/png/Black R.png")}
+                      {-1 (ut/make-image "images/50px/png/Yellow N.png")
+                        1 (ut/make-image "images/50px/png/Black N.png")}
+                      {-1 (ut/make-image "images/50px/png/Yellow B.png")
+                        1 (ut/make-image "images/50px/png/Black B.png")}
+                      {-1 (ut/make-image "images/50px/png/Yellow P.png")
+                        1 (ut/make-image "images/50px/png/Black P.png")}
+                      {-1 (ut/make-image "images/50px/png/Yellow K.png")
+                        1 (ut/make-image "images/50px/png/Black K.png")}]))
+  [{1 (ut/make-image "images/50px/png/Black Q.png")
+   -1 (ut/make-image "images/50px/png/Yellow Q.png")}]                     
+                       
+(def promotion-row {1 7 -1 0})                       
 
 (def chessPos->rank 
 (flatten ['rook 'knight 'bishop 'queen 'king 'bishop 'knight 'rook (repeat 8 'pawn)]))
@@ -60,7 +55,7 @@
                   :king      rul/king-moves})
                                    
 (defn rank->moves 
-"Returns all legal moves of piece p depending on rank of p (excluding pawn)." 
+"Returns all legal moves of piece p depending on rank of p (excluding pawn). Will be called only once to buffer the moves." 
 [p]
 (let [pos (:position p)            ;[[x y] (:position p) 
       r (keyword (:rank p))
@@ -86,26 +81,28 @@
                        ^clojure.lang.PersistentVector position 
                         rank ^long value direction]
  core/Piece 
- (update-position [this np] (ChessPiece. image np rank value direction {:alive true} nil))
+ (update-position [this np] (if (and (= (second np) (get promotion-row direction))
+                                     (= rank 'pawn)) (core/promote this np) 
+                                (ChessPiece. image np rank value direction {:alive true} nil)))
  (die [this]     (vary-meta this assoc :alive false)) ;communicate death through meta-data 
- (promote [this] (ChessPiece. image position rank value direction)) ;a pawn is promoted to a queen
+ (promote [this np] (ChessPiece. (get-in chess-images [:queen direction]) np 'queen 9 direction)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first  position) (second position) board-mappings-chess))
  (getPoint [this] (ut/make-point position))
  (getMoves [this b with-precious?]
   (let [[x y] position]
     (core/remove-illegal #(or 
-                             (core/collides? (core/dest->Move b this %) 
+                             (core/collides? (core/dest->Move b this % (:mover details)) 
                                  (ut/make-walker 
                                  (ut/resolve-direction position %) rank) b board-mappings-chess)
-                            (core/exposes? (core/dest->Move b this %) (if with-precious? 'king nil)))    
+                            (core/exposes? (core/dest->Move b this % (:mover details)) (if with-precious? 'king nil)))    
                   (if (= rank 'pawn) (apply ((keyword rank) chess-moves) (list b x y direction))                               
-                    (get-in buffered-moves [(core/translate-position 
-                                                  x y board-mappings-chess) (keyword rank)]))))) ;returns a list of points [x y]
+                    (get-in buffered-moves [(core/translate-position x y board-mappings-chess) 
+                                            (keyword rank)]))))) ;returns a list of points [x y]
  Object
  (toString [this] 
    (println "ChessItem (" rank ") at position:" (core/getListPosition this) " ->" position)) )
    
-(defrecord ChessPiece2 [^java.awt.Image image 
+#_(defrecord ChessPiece2 [^java.awt.Image image 
                         ^java.awt.Point position 
                          rank ^long value direction]
  core/Piece 
@@ -128,14 +125,16 @@
    
 (defn starting-chessItems
 "Will construct a set of initial chess items (16). black? specifies the side of the board where the pieces should be placed (true for north false for south)."
-[black?]
+[black?]         
 (if black?  
-(map #(ChessPiece. (second (chess-images (keyword %2))) 
+(map #(ChessPiece. (get-in chess-images [(keyword %2) 1])
       (core/translate-position % board-mappings-chess) %2
                        ((keyword %2) rel-values)  1 {:alive true} nil) (range 16) chessPos->rank)
-(map #(ChessPiece. (first (chess-images (keyword %2))) 
+(map #(ChessPiece. (get-in chess-images [(keyword %2) -1]) 
       (core/translate-position % board-mappings-chess) %2
                       ((keyword %2) rel-values)  -1 {:alive true} nil) (range 48 64) (reverse chessPos->rank))))
+                      
+                     
                       
 (def details "The map that describes the game of chess."
               {:name 'Chess
@@ -145,6 +144,9 @@
                :board-size 64 
                :total-pieces 32
                :rel-values rel-values
+               :mover core/move
+               :scorer core/score-chess-naive
+               :pref-depth 4
                :board-atom current-chessItems
                :game-starter start-chess!
                :hinter chess-best-move 
@@ -152,6 +154,8 @@
                :mappings board-mappings-chess
                :north-player-start  (starting-chessItems true)   ;opponent (black)
                :south-player-start  (starting-chessItems false)});human (white or yellow)
+               
+               
                    
 ;---------------------------------------------------------------------------------------------               
 
