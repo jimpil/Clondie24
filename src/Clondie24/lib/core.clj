@@ -5,6 +5,18 @@
 ;----------------------------------------<CODE>----------------------------------------------------------------------   
 (set! *unchecked-math* true)
 
+(def ^:const mappings-8x8
+"A vector of vectors. Outer vector represents the 64 (serial) positions chess-items can position themselves on. 
+ Each inner vector represents the coordinates of that position on the 8x8 grid."
+[[0 0] [1 0] [2 0] [3 0] [4 0] [5 0] [6 0] [7 0]
+ [0 1] [1 1] [2 1] [3 1] [4 1] [5 1] [6 1] [7 1]
+ [0 2] [1 2] [2 2] [3 2] [4 2] [5 2] [6 2] [7 2]
+ [0 3] [1 3] [2 3] [3 3] [4 3] [5 3] [6 3] [7 3]
+ [0 4] [1 4] [2 4] [3 4] [4 4] [5 4] [6 4] [7 4]
+ [0 5] [1 5] [2 5] [3 5] [4 5] [5 5] [6 5] [7 5]
+ [0 6] [1 6] [2 6] [3 6] [4 6] [5 6] [6 6] [7 6]
+ [0 7] [1 7] [2 7] [3 7] [4 7] [5 7] [6 7] [7 7]])
+
 (def board-history 
 "Log of the state of a game." 
 (atom []))
@@ -22,7 +34,7 @@
  (getListPosition [this])
  (getPoint [this]) ;for gui?
  (die [this])
- (promote [this])
+ (promote [this np])
  (getMoves [this board with-precious-piece?])) 
  
  (defprotocol Movable 
@@ -46,7 +58,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (def translate-position (memoize translate))
                     
 (defn piece 
-"Helper function for creating pieces. A piece is simply a record with 5 keys. Better not use this directly!"
+"Helper function for creating pieces. A piece is simply a record with 5 keys. Better not use this directly (slow)!"
  [game c pos rank direction] ;&{:keys [rank direction ]
                ;:or {rank 'zombie direction 1 r-value 1}}]
  ((ut/record-factory-aux (:record-name game)) c pos rank 
@@ -67,6 +79,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (definline alive? [p]
 `(:alive (meta ~p)))
 
+(defn game-over? [referee & args]
+(apply referee args))
+
 (defn empty-board 
 "Returns an empty board for the game provided - all nils." 
 [game] 
@@ -76,10 +91,16 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 "Builds a new board with nils where dead pieces." 
 [board]     
 `(into [] (r/map #(if (alive? %) % nil) ~board)))
-               
+
+(definline put 
+"Simple move fn that doesn't 'move' pieces but 'puts' them instead (e.g tic-tac-toe).
+ Returns the new board without making any state changes." 
+[board p]  
+`(assoc ~board (getListPosition ~p) ~p))              
 
 (defn move 
-"The function responsible for moving Pieces. Each piece knows how to move itself. Returns the resulting board without making any state changes. " 
+"The function responsible for moving Pieces. Each piece knows where it can move. 
+ Returns the resulting board without making any state changes. " 
 [board p coords] 
 ;{:pre [(satisfies? Piece p)]}  ;safety comes first
 ;(if  (some #{coords} (:mappings game-map)) ;check that the position exists on the grid
@@ -112,8 +133,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  (toString [this] 
    (println "Move from:" (getOrigin this) "to:" end-pos)))   
 
-(definline dest->Move "Constructor for creating moves." 
-[b p dest]  `(Move. ~p #(move ~b %1 %2) ~dest))
+(definline dest->Move "Constructor for creating moves. It wouldn't make sense to pass more than 1 mover-fns." 
+[b p dest mover]  `(if (nil? ~mover) (Move. ~p #(move ~b %1 %2) ~dest)
+                                     (Move. ~p #(~mover ~b %1 %2) ~dest)))
 
 (defn execute! [^Move m batom]
  (reset! batom (try-move m)))
@@ -138,9 +160,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
  
 (definline team-moves "Filters all the moves for the team with direction 'dir' on this board b. Returns a reducer." 
-[b dir]
+[b dir mover]
 `(let [team# (gather-team ~b ~dir) 
-       tmvs# (r/mapcat (fn [p#] (r/map #(dest->Move ~b p# %) (getMoves p# ~b true))) team#)]
+       tmvs# (r/mapcat (fn [p#] (r/map #(dest->Move ~b p# % ~mover) (getMoves p# ~b true))) team#)]
  tmvs# ))
 
 
@@ -149,7 +171,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
   [m b pos]
  (let [[x y] pos]
  (nil? 
-  (get b (translate-position x y m)))))  
+  (get b (translate-position x y m))))) 
+  
+(defn occupied? [m b pos]
+(complement vacant?))   
  
 (definline bury-dead [c]
  `(filter alive? ~c))  
@@ -183,15 +208,20 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
        dir# (get-in ~move [:p :direction])
        def-prec#  (some #(when (and (= ~precious (:rank %)) 
                                     (= dir# (:direction %))) %) next-b#)]
-(loop [opp-t#  (into [] (gather-team next-b# (unchecked-negate dir#)))]
+(some #(threatens? def-prec# % next-b#) 
+   (into [] (gather-team next-b# (unchecked-negate dir#)))))))
+
+
+#_(loop [opp-t#  (into [] (gather-team next-b# (unchecked-negate dir#)))]
 (if-not (seq opp-t#) false
  (if (threatens? def-prec# (first opp-t#) next-b#) true
-(recur (rest opp-t#))))))))
+(recur (rest opp-t#)))))
 
-
-#_(some #(threatens? def-prec# % next-b#) 
-   (into [] (gather-team next-b# (unchecked-negate dir#))))
-   
+(defn score-chess-naive ^long [b dir]
+ (let [hm (gather-team b dir) ;fixed bug
+       aw (gather-team b (unchecked-negate dir))]
+ (unchecked-subtract (r/reduce + (r/map :value hm)) 
+                     (r/reduce + (r/map :value aw)))))    
 
 (definline remove-illegal [pred ms]
 `(into [] (r/remove ~pred ~ms)))
