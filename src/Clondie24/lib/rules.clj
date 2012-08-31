@@ -11,7 +11,7 @@
                            
 
 (defn bishop-moves 
-"Returns the available moves for a bishop (on a 8x8 grid) given its current position and direction."
+"Returns the logical moves for a bishop (on a 8x8 grid) given its current position and direction."
 [x y]
 ;(remove #(collides? [x y] % (ut/make-walker (ut/resolve-direction [x y] %)) boa m dir)  
 (run* [q] 
@@ -26,7 +26,7 @@
    (== q [a b])))));)
      
 (defn pawn-moves 
-"Returns the available moves for a pawn (on a 8x8 grid) given its current position and direction." 
+"Returns the logical moves for a pawn (on a 8x8 grid) given its current position and direction." 
 [m boa x y dir]
  (let [xmax 8 ymax 8]
  (if (pos? dir) ;if moving south
@@ -61,63 +61,78 @@
     
     
 (defn checker-moves 
-"Returns the available moves for a checker (on a 8x8 grid) given its current position."
-[m boa x y dir ] 
+"Returns the logical moves for a checker (on a 8x8 grid) given its current position, board and direction."
+[m boa x y dir] 
 (let [xmax 8 ymax 8]
   (if (pos? dir) 
   (run* [q] 
    (fresh [a b] 
     (conde 
-     [(< (+ y 1) ymax) (< (+ x 1) xmax) (== a x) (== b y)
-                       (= nil (boa (translate-position (+ y 1) (+ x 1) m)))] ;landing pos must be vacant
-     [(< (+ y 1) ymax) (<= (- x 1) 0) (== a x) (== b y)
-                       (= nil (boa (translate-position (+ y 1) (- x 1) m)))] ;landing pos must be vacant
+     [(< (+ y 1) ymax) (< (+ x 1) xmax) (== a (+ x 1)) (== b (+ y 1))
+                       (= nil (get boa (try  (translate-position (+ x 1) (+ y 1) m) 
+                                       (catch Exception e -1))))] ;landing pos must be vacant
+     [(< (+ y 1) ymax) (>= (- x 1) 0) (== a (- x 1)) (== b (+ y 1))
+                       (= nil (get boa (try (translate-position (- x 1) (+ y 1)  m)
+                                       (catch Exception e -1))))] ;landing pos must be vacant
                        
-     [(< (+ y 2) ymax) (< (+ x 2) xmax) (== a x) (== b y)  ;attacking
-                       (!= nil (boa (translate-position (+ y 1) (+ x 1) m)))  ; pos in between must NOT be vacant
-                       (= nil  (boa (translate-position (+ y 2) (+ x 2) m)))] ;landing pos must be vacant
-     [(<= (- y 2) 0) (<= (- x 2) 0) (== a x) (== b y)  ;attacking
-                       (!= nil (boa (translate-position (- y 1) (- x 1) m)))   ; pos in between must NOT be vacant
-                       (= nil  (boa (translate-position (- y 2) (- x 2) m)))]) ;landing pos must be vacant
+     [(< (+ y 2) ymax) (< (+ x 2) xmax) (== a (+ x 2)) (== b (+ y 2))  ;attacking
+                       (= (:direction (get boa (try (translate-position (+ x 1) (+ y 1)  m)
+                                               (catch Exception e 0)))) (- dir))  ; pos in between must be enemy
+                       (= nil  (get boa (try (translate-position (+ x 2) (+ y 2)  m)
+                                        (catch Exception e -1))))] ;landing pos must be vacant
+     [(>= (+ y 2) 0) (>= (- x 2) 0) (== a (- x 2)) (== b (+ y 2))  ;attacking
+                       (= (:direction (get boa (try (translate-position (- x 1) (+ y 1)  m)
+                                               (catch Exception e 0)))) (- dir))   ; pos in between must be enemy
+                       (= nil  (get boa (try (translate-position (- x 2) (+ y 2)  m)
+                                        (catch Exception e -1))))]) ;landing pos must be vacant
      (== q [a b])))
   (run* [q] 
    (fresh [a b ] 
     (conde 
-     [(<= (- y 1) 0) (< (+ x 1) xmax) (== a x) (== b y) 
-                       (= nil(boa (translate-position (- y 1) (+ x 1) m)))]   ;landing pos must be vacant
-     [(<= (- y 1) 0) (<= (- x 1) 0) (== a x) (== b y)
-                       (= nil(boa (translate-position (- y 1) (- x 1) m)))]   ;landing pos must be vacant
-     [(<= (- y 2) 0) (< (+ x 2) xmax)  (== a x) (== b y)  ;attacking
-                       (!= nil (boa (translate-position (- y 1) (+ x 1) m))) ; pos in between must NOT be vacant
-                       (= nil (boa  (translate-position (- y 2) (+ x 2) m)))]    ;landing pos must be vacant                  
-     [(<= (- y 2) 0) (<= (- x 2) 0) (== a x) (== b y)  ;attacking
-                         (!= nil (boa (translate-position (- y 1) (- x 1) m))) ; pos in between must NOT be vacant
-                         (= nil  (boa (translate-position (- y 2) (- x 2) m)))])   ;landing pos must be vacant
-     (== q [a b]))))))    
+     [(>= (- y 1) 0) (< (+ x 1) xmax) (== a (+ x 1)) (== b (- y 1)) 
+                       (= nil (get boa (try (translate-position (+ x 1) (- y 1)  m)
+                                        (catch Exception e -1))))]   ;landing pos must be vacant
+     [(>= (- y 1) 0) (>= (- x 1) 0) (== a (- x 1)) (== b (- y 1))
+                       (= nil (get boa (try (translate-position (- x 1) (- y 1)  m)
+                                       (catch Exception e -1))))]   ;landing pos must be vacant
+     [(>= (- y 2) 0) (< (+ x 2) xmax)  (== a (+ x 2)) (== b (- y 2))  ;attacking
+                       (= (:direction (get boa (try (translate-position (+ x 1) (- y 1)  m)
+                                               (catch Exception e 0)))) (- dir)) ; pos in between must be enemy
+                       (= nil (get boa (try (translate-position (+ x 2) (- y 2)  m)
+                                       (catch Exception e -1))))]    ;landing pos must be vacant                  
+     [(>= (- y 2) 0) (>= (- x 2) 0) (== a (- x 2)) (== b (- y 2))  ;attacking
+                         (= (:direction (get boa (try (translate-position (- x 1) (- y 1)  m)
+                                                 (catch Exception e 0)))) (- dir)) ; pos in between must be enemy
+                         (= nil  (get boa (try (translate-position (- x 2) (- y 2)  m)
+                                          (catch Exception e -1))))])   ;landing pos must be vacant
+     (== q [a b])))))) 
+     
+(defn prince-moves "Returns the logical moves for a checker-prince (can move in both directions)." 
+[m boa x y dir]
+(concat (checker-moves m boa x y dir)
+        (checker-moves m boa x y (- dir))))        
     
 (defn rook-moves 
-"Returns the available moves for a rook (on a 8x8 grid) given its current position."
+"Returns the logical moves for a rook (on an empty 8x8 grid) given its current position."
 [x y]
-;(remove #(collides? [x y] % (ut/make-walker (ut/resolve-direction [x y] %)) boa m dir)
  (run* [q]
  (fresh [a b]
  (conde 
   [(membero a board) (!= a x) (== b y)]  ;y is constant
   [(membero b board) (!= b y) (== a x)]) ;x is constant
-  (== q [a b]))));)
+  (== q [a b]))))
   
 (defn queen-moves 
-"Returns the available moves for a queen (on a 8x8 grid) given its current position and direction.
+"Returns the logical moves for a queen (on an empty 8x8 grid) given its current position and direction.
  A quen basically has the moving abilities of a rook combined with a bishop." 
 [x y]
 (concat (rook-moves   x y) 
         (bishop-moves x y))) 
    
 (defn king-moves 
-"Returns the available moves for a king (on a 8x8 grid) given its current position."
+"Returns the logical moves for a king (on an empty 8x8 grid) given its current position."
 [x y]
 (let [xmax 8 ymax 8]
-;(remove #(collides? [x y] % (ut/make-walker (ut/resolve-direction [x y] %)) boa m dir)
  (run* [q]
  (fresh [a b]
   (conde 
@@ -130,13 +145,12 @@
     [(< (+ x 1) xmax) (> (- y 1) 0) (== a (+ x 1)) (== b (- y 1))]    ;7th possibility (diagonally)
     [(>= (- x 1) 0) (< (+ y 1) ymax) (== a (- x 1)) (== b (+ y 1))]   ;8th possibility (diagonally)
   ) 
-   (== q [a b])))));) ;return each solution in a vector [x, y]
+   (== q [a b]))))) ;return each solution in a vector [x, y]
 
 
 (defn knight-moves 
-"Returns the available moves for a knight (on a 8x8 grid) given its current position." 
+"Returns the logical moves for a knight (on a 8x8 grid) given its current position." 
  [x y]
-;(remove #(collides? [x y] % nil boa m dir)
 (let [xmax 8 ymax 8]
  (run* [q] ;bring back all possible solutions
  (fresh [a b]
@@ -150,7 +164,7 @@
     [(>= (- x 2)   0) (< (+ y 1) ymax) (== a (- x 2)) (== b (+ y 1))] ;7th possibility
     [(>= (- x 1)   0) (< (+ y 2) ymax) (== a (- x 1)) (== b (+ y 2))] ;8th possibility
   ) 
-   (== q [a b])))));) ;return each solution in a vector [x, y]
+   (== q [a b]))))) ;return each solution in a vector [x, y]
 
 
 
