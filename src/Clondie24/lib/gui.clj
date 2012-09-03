@@ -5,7 +5,7 @@
               [seesaw.chooser :as choo])
     (:import  [java.awt AlphaComposite Graphics Graphics2D]
               [java.awt.event MouseEvent]
-              [javax.swing SwingWorker]) )
+              [javax.swing SwingWorker UIManager]) )
               
 ;-------------------------------------<SOURCE-CODE>--------------------------------------------------------------------
 ;----------------------------------------------------------------------------------------------------------------------    
@@ -13,7 +13,7 @@
                 :highlighting? false
                 :busy? false 
                 :hint nil
-                :aux1 nil
+                :aux1 nil 
                 :aux2 nil
                 :aux3 nil
                 :whose-turn "Yellow"})
@@ -57,7 +57,8 @@
   (future (if (nil? ~storage-key) ~job
   (do (knob! ~storage-key ~job) 
       (ssw/invoke-later (ssw/repaint! ~c) 
-                        (ssw/config! ~c :cursor :default)))))))
+                        (ssw/config! ~c :cursor :default)
+                        (knob! :busy? false)))))))
       
 
 (defn clear! "Clears everything (history and current board)." [] 
@@ -150,8 +151,8 @@
 (defn highlight-rects [^Graphics g]
  (when (and (not (nil? (:selection @knobs))) (or (:hint @knobs) 
                                                  (:highlighting? @knobs))) 
- (let [pmvs (if-let [h (:hint @knobs)] (list (get-in h [:move :end-pos])) 
-                (core/getMoves (:selection @knobs) (peek @core/board-history) true))
+ (let [pmvs (if-let [h (:hint @knobs)] (list (get-in h [:move :end-pos])) ;expecting a hint?
+                (core/getMoves (:selection @knobs) (peek @core/board-history) true)) ;getMoves of selected piece
        balancer (balance :up)]
    (doseq [m pmvs]
      (let [[rx ry] (vec (map balancer m))]
@@ -175,8 +176,9 @@
  (draw-grid d g) 
  (draw-images g)
  (highlight-rects g)))
-               
-(defn canva-react [^MouseEvent e]
+ 
+(defmulti canva-react  (fn [_] (:name @curr-game))) ;ignore the argument
+(defmethod canva-react 'Chess [^MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e)) ;;(seesaw.mouse/location e)
       piece (identify-p (:mappings @curr-game) (peek @core/board-history) spot)
       sel   (:selection @knobs)]
@@ -194,13 +196,15 @@
        (core/dest->Move (peek @core/board-history) 
                         (:selection @knobs) 
                         (vec (map (balance :down) spot))
-                        (:mover @curr-game)) (:board-atom @curr-game)) 
+                        (:mover @curr-game)) (:board-atom @curr-game))
+      (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))] 
+      (ssw/alert (str "GAME OVER...\n " res)))                 
        (refresh {:whose-turn (turn (get-in @knobs [:selection :direction]))
                  :highlighting? false
                  :hint nil
                  :selection nil})
-       (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))
-       (ssw/repaint! canvas)))))
+       (ssw/repaint! canvas)
+       (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))))))
             
  
 (defonce canvas
@@ -218,7 +222,7 @@
 "Constructs and returns the entire arena frame." []
  (ssw/frame
     :title "Clondie24 Arena"
-    :size  [421 :by 502] ;412 :by 462 with border=5
+    :size  [421 :by 506] ;412 :by 462 with border=5
     :resizable? false
     :on-close :exit
     :menubar  (make-menubar)                   
@@ -253,13 +257,58 @@
 (do (refresh {:busy? true}) 
  (apply (:hinter @curr-game) 
           (list (get-in @knobs [:selection :direction]) (peek @core/board-history) depth)))))
-      
- 
+
+(defn set-laf! 
+"Set look and feel provided its name as a string." 
+[laf-name]
+(loop [lafs (UIManager/getInstalledLookAndFeels)]
+  (let [lf1 (first lafs)]
+(cond 
+  (empty? lafs) nil ;not found!
+  (= laf-name (.getName lf1)) ;found it!
+     (UIManager/setLookAndFeel (.getClassName lf1))
+:else (recur (rest lafs))))))
+
+(defmethod canva-react 'Checkers [^MouseEvent e]
+(let [spot  (vector (.getX e) (.getY e)) ;;(seesaw.mouse/location e)
+      piece (identify-p (:mappings @curr-game) (peek @core/board-history) spot)
+      sel   (:selection @knobs)]
+(cond 
+  (or
+    (and (nil? sel) (not (nil? piece)))           
+    (and (not (nil? sel)) (= (:direction piece) (:direction sel)))) 
+         (do (refresh {:highlighting? false 
+                       :hint nil
+                       :selection piece})
+             (ssw/repaint! canvas))
+  (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
+  (some #{(vec (map (balance :down) spot))} (map #(:end-pos %) (apply (:team-moves @curr-game)  
+                                                (list (peek @core/board-history) 
+                                                      (get-in @knobs [:selection :direction])))))
+  ;(core/getMoves (:selection @knobs) (peek @core/board-history) true))
+   (do (core/execute! 
+       (core/dest->Move (peek @core/board-history) 
+                        (:selection @knobs) 
+                        (vec (map (balance :down) spot))
+                        (:mover @curr-game)) (:board-atom @curr-game)) 
+       (refresh {:whose-turn (turn (get-in @knobs [:selection :direction]))
+                 :highlighting? false
+                 :hint nil
+                 :selection nil})
+       (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))
+       (ssw/repaint! canvas)))))
+
+
+(defmacro change 
+"Handy macro for resizing the frame outside the gui when we don't have access to swing." 
+[f w h]
+`(ssw/config! ~f :size [~w :by ~h]))
+     
                                                        
 (defn show-gui! "Everything starts from here." [game-map] 
-  (do #_(ssw/native!)
-        (deliver curr-game game-map) ;firstly make the gui aware of what game we want it to display
-        (ssw/invoke-later 
+  (do  (set-laf! "Nimbus") ;try to look nice
+       (deliver curr-game game-map) ;firstly make the gui aware of what game we want it to display
+       (ssw/invoke-later 
           (doto (make-arena) ssw/show!))))
                                                 
                
