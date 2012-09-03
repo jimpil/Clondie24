@@ -2,13 +2,14 @@
       (:require [Clondie24.lib.core :as core]
                 [clojure.core.reducers :as r]))
 
-(set! *unchecked-math* true)                 
+(set! *unchecked-math* true) 
+(def cpus-no (.. Runtime getRuntime availableProcessors)) ;may need it               
       
 (def curr-game "Before any searching we need a game-map." (promise))
 (declare score-by-count score-naive next-level)
 
 (defrecord Tree [root direction children])
-(defrecord Move->Tree [move tree])
+(defrecord Move->Tree  [move tree])
 (defrecord Move->Board [move board])
 (defrecord Move-Value  [move value])
 
@@ -60,18 +61,14 @@
 (repeat 30 (Move->Board. 'm1 b)))            
                 
 (defn next-level [b ^long dir] 
- (r/map #(Move->Board. % (core/try-move %)) (core/team-moves b dir (:mover @curr-game))))
+ (r/map #(Move->Board. % (core/try-move %)) 
+   ((:team-moves @curr-game) b dir (:mover @curr-game) false))) ;performance cheating again!
 
-(defn fake [^long dir b ^long d]
-(r/fold (/ (.. Runtime getRuntime availableProcessors) 2) best best ;2 = best so far
+(defn go [^long dir b ^long d]
+(let [successors (into [] (:children (game-tree dir b next-level)))]
+  (if (= 1 (count successors)) (first successors)     
+(r/fold (:chunking @curr-game) best best ;2 = best so far
  (r/map #(Move-Value. (:move %) (search (:scorer @curr-game) (:tree %) (dec d))) ;starting from children so decrement depth
-                       (into [] (:children (game-tree dir b next-level))))))
+                    successors )))))
                          
-#_(defn fake2 [dir b d] 
-(r/fold best  (into [] (:children (game-tree dir b next-level)))))    
-
-
- 
-
-
                 
