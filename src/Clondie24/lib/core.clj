@@ -145,7 +145,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 `(some #{(:position ~p2)} (getMoves ~p1 ~b false)))
 
 (defn undo! []
-(swap! board-history (comp vec butlast)))     
+(try (swap! board-history pop)
+(catch Exception e @board-history))) ;popping an empty stack throws an error (just return the empty one)    
       
 ;(for [letter "ABCDEFGH" ;strings are seqable
 ;     number (range 1 9)]
@@ -160,9 +161,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
  
 (definline team-moves "Filters all the moves for the team with direction 'dir' on this board b. Returns a reducer." 
-[b dir mover]
+[b dir mover exposes-check?]
 `(let [team# (gather-team ~b ~dir) 
-       tmvs# (r/mapcat (fn [p#] (r/map #(dest->Move ~b p# % ~mover) (getMoves p# ~b true))) team#)]
+       tmvs# (r/mapcat (fn [p#] (r/map #(dest->Move ~b p# % ~mover) (getMoves p# ~b ~exposes-check?))) team#)]
  tmvs# ))
 
 
@@ -203,7 +204,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 :else (recur (walker [imm-x imm-y])))))
 
 (definline exposes? [move precious]
-`(if-not ~precious false
+`(if-not ~precious false ;skip everything
  (let [next-b# (try-move ~move)
        dir# (get-in ~move [:p :direction])
        def-prec#  (some #(when (and (= ~precious (:rank %)) 
