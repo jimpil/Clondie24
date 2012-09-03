@@ -33,37 +33,35 @@
 (apply (r checker-moves) pos))) ;will return a fn which is called with current x and y
 
 (definline jump? [s e]
-`(> (Math/abs (- (first ~e) 
-                 (first ~s))) 1)) 
-                 
-                
+`(-> (Math/abs (- (first ~e) 
+                  (first ~s))) 
+      (rem  2)
+      (= 0))) 
+                                 
                                                             
 #_(defn between [sp ep]
 (ut/walk (ut/resolve-direction sp ep) sp))
 
 (defn move [board p coords]
+(if (jump? (:position p) coords)
 (let [newPiece (core/update-position p coords)
       old-pos  (core/getListPosition p)
       new-pos  (core/getListPosition newPiece)]
- (if (jump? (:position p) coords) ;(> (Math/abs (- (first coords) (first (:position p)))) 1)
-   (-> board 
+(-> board 
      (transient)  
      (assoc! old-pos nil) 
      (assoc! new-pos newPiece) 
      (assoc! (let [between (ut/walk (ut/resolve-direction (:position p) coords) (:position p))]  ;the piece in between
                 (core/translate-position
                  (first between) (second between) board-mappings-checkers)) nil)
-     (persistent!))
-(-> board 
-     (transient)  
-     (assoc! old-pos nil) 
-     (assoc! new-pos newPiece)
-     (persistent!)))  ))
+     (persistent!)))
+(core/move board p coords))) ;;use the core one if there is no kill
+
      
      
-(definline team-moves "Jumps have priority." [b dir]
-`(let [all# (core/team-moves ~b ~dir move) ;;our specific move-fn
-      jumps# (filter #(:jump? (meta %)) all#)]
+(definline team-moves "Jumps have priority." [b dir & more]
+`(let [all# (into [] (core/team-moves ~b ~dir move nil)) ;;our specific move-fn
+      jumps# (filter #(jump? (get-in % [:p :position]) (:end-pos %))  all#)]
  (if (seq jumps#) jumps# all#)))      
 
 (defrecord CheckersPiece [^java.awt.Image image
@@ -80,17 +78,17 @@
  (getPoint [this] (ut/make-point position))
  (getMoves [this b _] 
                   (let [[x y] position]
-                  (map #(with-meta % {:jump? (jump? position %)}) 
+                  ;(map #(with-meta % {:jump? (jump? position %)}) 
                    (-> ((keyword rank) checkers-moves) 
-                         (apply (list b x y direction))))))
+                         (apply (list b x y direction)))))
  Object
  (toString [this] 
    (println "Checker (" rank ") at position:" (core/getListPosition this) " ->" position)) )
 
 (defn starting-checkers
 "Will construct a set of initial checkers (12). opponent? specifies the side of the board where the pieces should be placed (true for north false for south)." 
-[opponent?]                                  
-(if opponent?                (get-in checkers-images [:soldier 1])
+[opponent?]           
+(if opponent?               
 (map #(if (nil? %) nil 
          (CheckersPiece. (get-in checkers-images [:soldier 1])
          (core/translate-position % board-mappings-checkers) 'soldier 1 1 {:alive true} nil)) 
@@ -120,19 +118,26 @@
 (let [ hm (into [] (core/gather-team b dir))
        aw (into [] (core/gather-team b (unchecked-negate dir)))]
  (unchecked-subtract (count hm) 
-                     (count aw)))) 
+                     (count aw))))
+                     
+(defn checkers-best-move [dir b n] 
+(s/go dir b n))                    
                        
 (def details "Returns a map that describes the game of checkers."
               {:name 'Checkers
-               :players 2 
+               :players 2
+               :chunking 1
                :images checkers-images
                :characteristics [:image :position :rank :value :direction]  
                :board-size 64 
                :total-pieces 48 ;24 ;;temporary hack
+               :obligatory-move 'jump
                :rel-values {:soldier 1 :prince 3}
                :mover move
+               :team-moves team-moves
+               :hinter checkers-best-move
                :scorer score-by-count
-               :pref-depth 4
+               :pref-depth 6
                :board-atom  current-checkers
                :record-name "Clondie24.checkers.CheckersPiece"
                :game-starter start-checkers!
@@ -141,7 +146,7 @@
                :south-player-start  (starting-checkers false)})              
             
 
-(def make-checker   (partial core/piece details)) ;better avoiding this indirection (involves reflection) 
+(def make-checker  (partial core/piece details)) ;better avoiding this indirection (involves reflection) 
 
                  
 (defn to-2d [b] ; the checkers or chess board as 8 rows of 8 columns
@@ -164,8 +169,8 @@
 "Starts a graphical (swing) Chess game." 
 [& args]  
 (gui/show-gui! details)
-#_(time (s/fake -1 (start-chess! false) 4) #_(println @s/mmm))
-#_(time (do (s/fake -1 (start-chess! false) 4) (println @s/mmm))) 
+#_(time (s/go -1 (start-checkers! false) 6) #_(println @s/mmm))
+#_(time (do (s/go -1 (start-checkers! false) 4) (println @s/mmm))) 
 )            
             
             
