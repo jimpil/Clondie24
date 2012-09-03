@@ -80,7 +80,7 @@
                                                (catch Exception e 0)))) (- dir))  ; pos in between must be enemy
                        (= nil  (get boa (try (translate-position (+ x 2) (+ y 2)  m)
                                         (catch Exception e -1))))] ;landing pos must be vacant
-     [(>= (+ y 2) 0) (>= (- x 2) 0) (== a (- x 2)) (== b (+ y 2))  ;attacking
+     [(< (+ y 2) ymax) (>= (- x 2) 0) (== a (- x 2)) (== b (+ y 2))  ;attacking
                        (= (:direction (get boa (try (translate-position (- x 1) (+ y 1)  m)
                                                (catch Exception e 0)))) (- dir))   ; pos in between must be enemy
                        (= nil  (get boa (try (translate-position (- x 2) (+ y 2)  m)
