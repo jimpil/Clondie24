@@ -10,6 +10,9 @@
 ;----------------------------------------<CODE>----------------------------------------------------------------------
 
 (def board-mappings-chess core/mappings-8x8)
+(def previous-move (atom nil))  ;will need this for en-passant
+(def state-dependent-moves (atom {:castling nil 
+                                  :en-passant nil})) 
 
 
 (def chess-images "All the chess images paired up according to rank."
@@ -40,7 +43,7 @@
 (declare details, start-chess!, buffered-moves) ;;will need these
 
 (defn chess-best-move [dir b n] 
-(s/fake dir b n))
+(s/go dir b n))
 
 (def current-chessItems
 "This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
@@ -73,6 +76,22 @@
   (if fast? (into-array  (core/starting-board details))
                          (core/starting-board details)))
     ));mandatory before game starts 
+    
+(defn jit-referee ;just-in-time referee
+"Inspects the board for missing kings. If no team is missing its king returns nil (no winner),
+ otherwise returns the direction of the team which has a king still standing (winner)." 
+ [b]
+ (let [kings (filter #(= (:rank %) 'king) b)]
+   (if (= 2 (count kings)) nil ;;no winners
+     (:direction (first kings))))) ;;return the direction of the king still standing 
+     
+(definline gui-referee [b] ;referee a-la checkmate for the gui
+`(let [t1-moves# (into [] (core/team-moves ~b  1 core/move true))
+       t2-moves# (into [] (core/team-moves ~b -1 core/move true))]
+ (cond 
+    (empty? t1-moves#) "Yellow wins!"  ;;yellow won
+    (empty? t2-moves#) "Black wins!"   ;;black won
+ :else nil)))                 ;;no winner    
                
 (def chess-piece  (partial core/piece details))
 (def vacant-chess-tile? (partial core/vacant? board-mappings-chess))                         
@@ -139,12 +158,17 @@
 (def details "The map that describes the game of chess."
               {:name 'Chess
                :players 2 
+               :chunking 2
                :images chess-images
                :characteristics [:image :position :rank :value]      
                :board-size 64 
                :total-pieces 32
                :rel-values rel-values
+               :obligatory-move nil
+               :team-moves core/team-moves
                :mover core/move
+               :referee-gui gui-referee
+               :referee-jit jit-referee
                :scorer core/score-chess-naive
                :pref-depth 4
                :board-atom current-chessItems
@@ -177,8 +201,8 @@
 "Starts a graphical (swing) Chess game." 
 [& args]  
 (gui/show-gui! details)
-#_(time (s/fake -1 (start-chess! false) 4) #_(println @s/mmm))
-#_(time (do (s/fake -1 (start-chess! false) 4) (println @s/mmm))) 
+#_(time (s/go -1 (start-chess! false) 4) #_(println @s/mmm))
+#_(time (do (s/go -1 (start-chess! false) 4) (println @s/mmm))) 
 )
 
 
