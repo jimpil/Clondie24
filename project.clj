@@ -1,4 +1,4 @@
-(defproject Clondie24 "0.1.0-SNAPSHOT"
+(defproject Clondie24 "0.3.0-SNAPSHOT"
   :description "Blondie24 Extreme-Makeover! "
   :url "https://github.com/jimpil/Clondie24"
   :license {:name "Eclipse Public License"
@@ -9,7 +9,7 @@
                 ; [midje "1.4.0"]
                  [ghostandthemachine/seesaw "1.4.3-SNAPSHOT" :exclusions [org.clojure/clojure]] 
                  ;[seesaw "1.4.2" :exclusions [org.clojure/clojure]]
-                 [enclog "0.5.7-SNAPSHOT"] 
+                 [enclog "0.5.8-SNAPSHOT"] 
                  ]
   :dev-dependencies [[midje "1.4.0"]]               
   ;:plugins [[lein-swank "1.4.4"]]             
