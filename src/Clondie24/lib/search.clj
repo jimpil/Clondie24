@@ -40,19 +40,19 @@
     
 (defn search "The recursion of min-max algorithm." 
 [eval-fn tree depth]
-(letfn [(minimize ^long [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
+(letfn [(minimize ^double [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-min 
                                   (r/map #(maximize (:tree %) (dec d)) (:children tree)))))
-        (maximize ^long [tree d] (if(zero? d) (eval-fn (:root tree) (:direction tree))
+        (maximize ^double [tree d] (if(zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-max   
                                    (r/map #(minimize (:tree %) (dec d)) (:children tree)))))] 
-(minimize tree depth)))    
+(minimize tree (int depth))))    
     
 
 (defn evaluator
   [eval-fn depth]
   (fn [t]
-    (search eval-fn t depth)))
+    (search eval-fn t (int depth))))
  
 (definline fscore [b dir]
 `(rand-int  10))
@@ -64,11 +64,11 @@
  (r/map #(Move->Board. % (core/try-move %)) 
    ((:team-moves @curr-game) b dir (:mover @curr-game) false))) ;performance cheating again!
 
-(defn go [^long dir b ^long d]
+(defn go [^long dir b ^long d scorer]
 (let [successors (into [] (:children (game-tree dir b next-level)))]
   (if (= 1 (count successors)) (first successors)     
 (r/fold (:chunking @curr-game) best best ;2 = best so far
- (r/map #(Move-Value. (:move %) (search (:scorer @curr-game) (:tree %) (dec d))) ;starting from children so decrement depth
+ (r/map #(Move-Value. (:move %) (search scorer (:tree %) (dec d))) ;starting from children so decrement depth
                     successors )))))
                          
                 
