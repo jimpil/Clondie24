@@ -36,8 +36,26 @@
         max-arg-count (apply max  (map #(count (.getParameterTypes ^java.lang.reflect.Constructor %))
                                        (.getConstructors recordclass)))
         args (map #(symbol (str "x" %)) (range max-arg-count))]
-    (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))   
+    (eval `(fn [~@args] (new ~(symbol recordname) ~@args))))) 
     
+      
+(defmacro with-captured-inputs 
+ [f & args]
+`(try (~f ~@args)
+  (catch Exception e# (do (println "ERROR!") 
+                           {:exception e# 
+                            :function ~f 
+                            :inputs (vector ~@args)})))) 
+                            
+(defmacro defn-capt [name [& args] & code]
+`(defn ~name [~@args] 
+   (try ~@code
+   (catch Exception e# (do (println "ERROR!")
+                          {:exception e#
+                           :origin ~name
+                           :inputs (vector ~@args)}))))) 
+;(defn-capt foo [a b] (/ a b))
+;(foo 1 0)                                
 
 (defn double? [e]
 (if (= (class e) (Class/forName "java.lang.Double")) true false))
@@ -57,9 +75,8 @@
 ;Helper fn for creting Points
 (defn make-point 
 "Helper fn for creting java.awt.Point out of a [x y] coords." 
-^java.awt.Point [p]
-(let [[x y] p]
-(java.awt.Point. x y)))
+^java.awt.Point [[x y]]
+(java.awt.Point. x y))
 
 
 (defn make-image 
@@ -67,7 +84,7 @@
 [^String path-to-image]
 (try 
   (javax.imageio.ImageIO/read (java.io.File. path-to-image))
-(catch java.io.IOException e ;returning nil here is ok for now! 
+(catch java.io.IOException e ;returning nil here  
   (println path-to-image "does not exist! Reverting to 'nil'..."))))
 
 ;Helper fn for creting pre-defined Colours
@@ -99,9 +116,6 @@
  (defn Point->Vec [^java.awt.Point p]
  (vector (.x p) (.y p)))
  
- (defn Vec->Point [v]
- (java.awt.Point. (first v) (second v)))
- 
 (defn no-nils 
 "Filter out nils from a collection." 
  [c] 
@@ -113,15 +127,15 @@
 (print-table (:characteristics game);the columns
       (deref (:board-atom game))))  ;the rows
 
-(defn serialize-board! 
-"Serialize the board b on to the disk using Java serialization. Filename needs no extension - it will be appended (.ser)."
+(defn serialize! 
+"Serialize the object b on to the disk using Java serialization. Filename needs no extension - it will be appended (.ser)."
 [b fname]
 (with-open [oout (java.io.ObjectOutputStream. 
                  (java.io.FileOutputStream. (str fname ".ser")))]
                  (.writeObject oout b)))
                 
-(defn deserialize-board 
-"Deserializes a vector from the disk using Java serialization. Filename needs no extension - it will be appended (.ser)." 
+(defn deserialize! 
+"Deserializes the object  in file f from the disk using Java serialization. Filename needs no extension - it will be appended (.ser)." 
 ^clojure.lang.PersistentVector [fname]
 (let [^clojure.lang.PersistentVector upb (promise)] ;waiting for the value shortly
   (with-open [oin (java.io.ObjectInputStream. 
@@ -130,15 +144,16 @@
        @upb))
        
 (defn data->string
-"Writes the data-structure b on a file f on disk as a string." 
+"Writes the clojure data-structure b on a file f on disk as a string." 
 [b f]
-(spit f b))
+(io! (spit f b)))
 
 (defn string->data
-"Read the file f back on memory. Contents of f should be a clojure data-structure." 
+"Read the file f back on memory safely. Contents of f should be a clojure data-structure." 
 [f]
-(binding [*read-eval* false]
-(read-string (slurp f))))                            
+(io!
+ (binding [*read-eval* false]
+ (read-string (slurp f)))))                            
 
          
 (defn old-table-model 
