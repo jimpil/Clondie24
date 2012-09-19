@@ -3,7 +3,7 @@
               [Clondie24.lib.core :as core] 
               [seesaw.core :as ssw]
               [seesaw.chooser :as choo])
-    (:import  [java.awt AlphaComposite Graphics Graphics2D]
+    (:import  [java.awt AlphaComposite Graphics Graphics2D Toolkit]
               [java.awt.event MouseEvent]
               [javax.swing SwingWorker UIManager]) )
               
@@ -11,7 +11,7 @@
 ;----------------------------------------------------------------------------------------------------------------------    
 (def brand-new {:selection nil
                 :highlighting? false
-                :busy? false 
+                :block? false 
                 :hint nil
                 :aux1 nil 
                 :aux2 nil
@@ -26,9 +26,9 @@
 
 (def curr-game (promise))
 
-(definline refresh [m]
-`(doseq [e# ~m]
- (knob! (first e#) (second e#))))
+(defn refresh [& {:as knobs}]
+(doseq [e knobs]
+ (knob! (first e) (second e))))
  
 (defmacro reset-knobs! []
 `(reset! knobs brand-new)) 
@@ -58,7 +58,8 @@
   (do (knob! ~storage-key ~job) 
       (ssw/invoke-later (ssw/repaint! ~c) 
                         (ssw/config! ~c :cursor :default)
-                        (knob! :busy? false)))))))
+                        (knob! :block? false)
+                        (.. Toolkit getDefaultToolkit beep)))))))
       
 
 (defn clear! "Clears everything (history and current board)." [] 
@@ -97,14 +98,14 @@
                         :tip  "Start new game." 
                         :key  "menu N")                           
       a-save (ssw/action :handler (fn [e] (choo/choose-file :type :save
-                                                            :filters [["Clojure-data" ["clo"]]] ;;use the reader for now
+                                                            :filters [["Clojure-data" ["clo"]]] ;;use the reader for convenience
                                                             :success-fn (fn [_ f] (ut/data->string @core/board-history f))))
       
                         :name "Save" 
                         :tip "Save a game to disk." 
                         :key "menu S")
       a-load (ssw/action :handler (fn [e]  (when-let [f (choo/choose-file :filters [["Clojure-data" ["clo"]]])]  
-                                           (reset! core/board-history (ut/string->data f))));;use the reader for now
+                                           (reset! core/board-history (ut/string->data f))));;use the reader for convenience
                         :name "Load" 
                         :tip  "Load a game from disk." 
                         :key  "menu L")
@@ -186,9 +187,9 @@
   (or
     (and (nil? sel) (not (nil? piece)))           
     (and (not (nil? sel)) (= (:direction piece) (:direction sel)))) 
-         (do (refresh {:highlighting? false 
-                       :hint nil
-                       :selection piece})
+         (do (refresh :highlighting? false 
+                      :hint nil
+                      :selection piece)
              (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
   (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history) true))
@@ -197,29 +198,29 @@
                         (:selection @knobs) 
                         (vec (map (balance :down) spot))
                         (:mover @curr-game)) (:board-atom @curr-game))
-      (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))] 
-      (ssw/alert (str "GAME OVER...\n " res)))                 
-       (refresh {:whose-turn (turn (get-in @knobs [:selection :direction]))
-                 :highlighting? false
-                 :hint nil
-                 :selection nil})
+      (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))];check if we have a winner 
+      (do (ssw/alert (str "GAME OVER...\n " res))
+          (knob! :block? true))) ;block movements if someone won               
+       (refresh :whose-turn (turn (get-in @knobs [:selection :direction]))
+                :highlighting? false
+                :hint nil
+                :selection nil)
        (ssw/repaint! canvas)
        (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))))))
             
  
-(defonce canvas
+(def canvas "The paintable canvas - our board"
  (ssw/canvas
     :paint draw-tiles
     :id :canvas
-    :listen [:mouse-clicked (fn [e] (when-not (:busy? @knobs) 
+    :listen [:mouse-clicked (fn [e] (when-not (:block? @knobs) 
                                               (canva-react e)))]
-    ;:background "#222222"; no need for background
+    ;:background "#222222"; no need for background anymore
     ))
 
 (def status-label (ssw/label :id :status :text "Ready!"))
     
-(defn make-arena 
-"Constructs and returns the entire arena frame." []
+(defn arena "Constructs and returns the entire arena frame." []
  (ssw/frame
     :title "Clondie24 Arena"
     :size  [421 :by 506] ;412 :by 462 with border=5
@@ -231,20 +232,20 @@
                :hgap 10
                :vgap 10
                :north  (ssw/horizontal-panel :items 
-                       [(ssw/button :text "Undo"  :listen [:action (fn [e] (when-not (:busy? @knobs) 
-                                                                           (do (refresh {:highlighting? false 
-                                                                                         :hint nil}) 
+                       [(ssw/button :text "Undo"  :listen [:action (fn [e] (when-not (:block? @knobs) 
+                                                                           (do (refresh :highlighting? false 
+                                                                                        :hint nil) 
                                                                                (undo!) (ssw/repaint! canvas))))]) [:fill-h 10] 
-                        (ssw/button :text "Clear" :listen [:action (fn [e] (when-not (:busy? @knobs)
-                                                                           (do (refresh {:highlighting? false 
-                                                                                         :hint nil}) 
+                        (ssw/button :text "Clear" :listen [:action (fn [e] (when-not (:block? @knobs)
+                                                                           (do (refresh :highlighting? false 
+                                                                                        :hint nil) 
                                                                                (clear!) (ssw/repaint! canvas))))]) [:fill-h 10]
-                        (ssw/button :text "Available Moves" :listen [:action (fn [e] (when-not (:busy? @knobs) 
-                                                            (do (refresh {:highlighting? true 
-                                                                          :hint nil}) 
+                        (ssw/button :text "Available Moves" :listen [:action (fn [e] (when-not (:block? @knobs) 
+                                                            (do (refresh :highlighting? true 
+                                                                         :hint nil) 
                                                                 (ssw/repaint! canvas))))]) [:fill-h 10]
-                        (ssw/button :text "Hint" :listen [:action (fn [e] (when-not (:busy? @knobs)
-                                                     (do (refresh {:highlighting? false}) 
+                        (ssw/button :text "Hint" :listen [:action (fn [e] (when-not (:block? @knobs)
+                                                     (do (refresh :highlighting? false) 
                                                          (with-busy-cursor canvas 
                                                           (hint (:pref-depth @curr-game)) :hint))))]) [:fill-h 10]])
                :center canvas
@@ -253,21 +254,17 @@
                
 (defn hint "Ask the computer for a hint." 
 [depth] 
-(when-not (:busy? @knobs) ;ONLY IF NOT 'THINKING'
-(do (refresh {:busy? true}) 
+(when-not (:block? @knobs) ;ONLY IF NOT 'THINKING'
+(do (refresh :block? true) 
  (apply (:hinter @curr-game) 
           (list (get-in @knobs [:selection :direction]) (peek @core/board-history) depth)))))
+          
 
-(defn set-laf! 
-"Set look and feel provided its name as a string." 
+(defn set-laf! "Set look and feel of the ui, provided its name as a string."  
 [laf-name]
-(loop [lafs (UIManager/getInstalledLookAndFeels)]
-  (let [lf1 (first lafs)]
-(cond 
-  (empty? lafs) nil ;not found!
-  (= laf-name (.getName lf1)) ;found it!
-     (UIManager/setLookAndFeel (.getClassName lf1))
-:else (recur (rest lafs))))))
+(when-let [lf1 (some #(when (= laf-name (.getName %)) %) (UIManager/getInstalledLookAndFeels))]
+ (UIManager/setLookAndFeel (.getClassName lf1))))
+ 
 
 (defmethod canva-react 'Checkers [^MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e)) ;;(seesaw.mouse/location e)
@@ -277,24 +274,24 @@
   (or
     (and (nil? sel) (not (nil? piece)))           
     (and (not (nil? sel)) (= (:direction piece) (:direction sel)))) 
-         (do (refresh {:highlighting? false 
-                       :hint nil
-                       :selection piece})
+         (do (refresh :highlighting? false 
+                      :hint nil
+                      :selection piece)
              (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
-  (some #{(vec (map (balance :down) spot))} (map #(:end-pos %) (apply (:team-moves @curr-game)  
+ (and (some #{(vec (map (balance :down) spot))} (map #(:end-pos %) (apply (:team-moves @curr-game)  
                                                 (list (peek @core/board-history) 
                                                       (get-in @knobs [:selection :direction])))))
-  ;(core/getMoves (:selection @knobs) (peek @core/board-history) true))
+  (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history) nil)))
    (do (core/execute! 
        (core/dest->Move (peek @core/board-history) 
                         (:selection @knobs) 
                         (vec (map (balance :down) spot))
                         (:mover @curr-game)) (:board-atom @curr-game)) 
-       (refresh {:whose-turn (turn (get-in @knobs [:selection :direction]))
-                 :highlighting? false
-                 :hint nil
-                 :selection nil})
+       (refresh :whose-turn (turn (get-in @knobs [:selection :direction]))
+                :highlighting? false
+                :hint nil
+                :selection nil)
        (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))
        (ssw/repaint! canvas)))))
 
@@ -309,7 +306,7 @@
   (do  (set-laf! "Nimbus") ;try to look nice
        (deliver curr-game game-map) ;firstly make the gui aware of what game we want it to display
        (ssw/invoke-later 
-          (doto (make-arena) ssw/show!))))
+          (doto (arena) ssw/show!))))
                                                 
                
         
