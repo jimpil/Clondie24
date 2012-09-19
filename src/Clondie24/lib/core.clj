@@ -213,16 +213,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
    (into [] (gather-team next-b# (unchecked-negate dir#)))))))
 
 
-#_(loop [opp-t#  (into [] (gather-team next-b# (unchecked-negate dir#)))]
-(if-not (seq opp-t#) false
- (if (threatens? def-prec# (first opp-t#) next-b#) true
-(recur (rest opp-t#)))))
-
-(defn score-chess-naive ^long [b dir]
+(defn score-chess-naive ^double [b dir]
  (let [hm (gather-team b dir) ;fixed bug
        aw (gather-team b (unchecked-negate dir))]
- (unchecked-subtract (r/reduce + (r/map :value hm)) 
-                     (r/reduce + (r/map :value aw)))))    
+ (- (r/reduce + (r/map :value hm)) 
+    (r/reduce + (r/map :value aw)))))    
 
 (definline remove-illegal [pred ms]
 `(into [] (r/remove ~pred ~ms)))
