@@ -3,7 +3,12 @@
               [Clondie24.lib.core :as core]
               [Clondie24.lib.search :as s]
               [Clondie24.lib.rules :as rul]
-              [Clondie24.lib.gui :as gui] :verbose :reload)
+              [Clondie24.lib.gui :as gui]
+              [enclog.nnets :as ai]
+              [enclog.training :as evol]
+              [enclog.normalization :as norm] :verbose :reload)
+    (:import  [encog_java.customGA CustomNeuralGeneticAlgorithm 
+                                   CustomGeneticScoreAdapter Referee])
 )
 
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
@@ -13,7 +18,8 @@
 (def previous-move (atom nil))  ;will need this for en-passant
 (def state-dependent-moves (atom {:castling nil 
                                   :en-passant nil})) 
-
+(defrecord Player [brain ^int direction])
+                                 
 
 (def chess-images "All the chess images paired up according to rank."
 (zipmap '(:queen :rook :knight :bishop :pawn :king)
@@ -42,8 +48,12 @@
 
 (declare details, start-chess!, buffered-moves) ;;will need these
 
-(defn chess-best-move [dir b n] 
-(s/go dir b n))
+(definline chess-best-move [dir b n scorer] 
+`(s/go ~dir ~b ~n ~scorer))
+
+(defn chess-rand-move [dir b _]
+(let [all-moves (into [] (core/team-moves b dir core/move true))]
+{:move (get all-moves (rand-int (count all-moves)))})) 
 
 (def current-chessItems
 "This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
@@ -77,23 +87,24 @@
                          (core/starting-board details)))
     ));mandatory before game starts 
     
-(defn jit-referee ;just-in-time referee
+(definline jit-referee ;just-in-time referee
 "Inspects the board for missing kings. If no team is missing its king returns nil (no winner),
  otherwise returns the direction of the team which has a king still standing (winner)." 
  [b]
- (let [kings (filter #(= (:rank %) 'king) b)]
-   (if (= 2 (count kings)) nil ;;no winners
-     (:direction (first kings))))) ;;return the direction of the king still standing 
+ `(let [kings# (filter #(= (:rank %) 'king) ~b)]
+   (if (= 2 (count kings#)) nil ;;no winners
+     (:direction (first kings#))))) ;;return the direction of the king still standing 
      
 (definline gui-referee [b] ;referee a-la checkmate for the gui
 `(let [t1-moves# (into [] (core/team-moves ~b  1 core/move true))
        t2-moves# (into [] (core/team-moves ~b -1 core/move true))]
  (cond 
-    (empty? t1-moves#) "Yellow wins!"  ;;yellow won
-    (empty? t2-moves#) "Black wins!"   ;;black won
- :else nil)))                 ;;no winner    
+    (empty? t1-moves#) "Yellow wins!"  
+    (empty? t2-moves#) "Black wins!"   
+ :else nil)))         ;;no winner    
                
 (def chess-piece  (partial core/piece details))
+
 (def vacant-chess-tile? (partial core/vacant? board-mappings-chess))                         
 
 (defrecord ChessPiece [^java.awt.Image image 
@@ -153,7 +164,11 @@
       (core/translate-position % board-mappings-chess) %2
                       ((keyword %2) rel-values)  -1 {:alive true} nil) (range 48 64) (reverse chessPos->rank))))
                       
-                     
+(def brain (ai/network (ai/neural-pattern :feed-forward) 
+                        :activation :sigmoid
+                        :input 64 ;the entire board for input
+                        :output 1 ;the score
+                        :hidden [80 40 10])) ; 3 hidden layers                      
                       
 (def details "The map that describes the game of chess."
               {:name 'Chess
@@ -169,7 +184,7 @@
                :mover core/move
                :referee-gui gui-referee
                :referee-jit jit-referee
-               :scorer core/score-chess-naive
+               :naive-scorer core/score-chess-naive
                :pref-depth 4
                :board-atom current-chessItems
                :game-starter start-chess!
@@ -179,8 +194,26 @@
                :north-player-start  (starting-chessItems true)   ;opponent (black)
                :south-player-start  (starting-chessItems false)});human (white or yellow)
                
-               
-                   
+                      
+(defmacro definvokable
+  [type fields & deftype-tail]
+  (let [f        (fields 0)
+        args     (repeatedly 20 gensym)
+        arity    (fn [n]
+                   (let [args (take n args)]
+                     `(invoke [this# ~@args] ((. this# ~f) ~@args))))
+        vararg   `(invoke [this# ~@args more#]
+                    (apply (. this# ~f) ~@args more#))
+        apply-to `(applyTo [this# args#] (apply (. this# ~f) args#))]
+    `(deftype ~type
+       ~fields
+       clojure.lang.IFn
+       ~@(map arity (range (inc 20)))
+       ~vararg
+       ~apply-to
+       ~@deftype-tail))) 
+       
+;(definvokable brain )                                                           
 ;---------------------------------------------------------------------------------------------               
 
 #_(def buffered-moves 
@@ -193,14 +226,91 @@
      (map #(rank->moves (ChessPiece. nil (core/translate-position k board-mappings-chess) % 
                ((keyword %) (:rel-values details)) nil)) 
       ['rook 'knight 'bishop 'queen 'king])))))))
+      
+(defn neural-input )
+      
+(defn neural-input "Returns 64 inputs for the neural net." 
+[b dir fields?]
+((if fields? norm/input identity) 
+  (for [t b] (if (nil? t) 0 (* dir (:direction t) (:value t)))))) ;or maybe :direction instead of :value? 
+  
+(definline neural-output "Creates output-field based on this InputField." 
+[inputs] 
+`(norm/output ~inputs))
+
+(defn normalize-fields [ins outs]
+((norm/prepare :range [ins] [outs]) false 
+  (norm/target-storage :norm-array [64 nil])))          
+  
+(definline anormalise "Deals directly with seqs (input) and arrays (output)." 
+[ins]
+`(norm/prepare :array-range nil nil :raw-seq ~ins))  
+
+(defn tournament
+"Starts a tournament between the 2 players (p1, p2). If there is no winner, returns the entire history (vector) of 
+ the tournament after 100 moves. If there is a winner, a 2d vector will be returned containing both the history and the winner." 
+[sb depth p1 p2]
+(reduce 
+  (fn [history player] 
+  (let [cb (peek history) 
+        win-dir (jit-referee cb)]
+    (if win-dir (reduced (vector history (if (= win-dir (:direction p1)) p1 p2)))
+    (conj history (-> ((:brain player) (:direction player) cb depth) ;TODO
+                      (:move)
+                      (core/try-move)))))) 
+ [sb] (take 100 (cycle [p1 p2])))) ;;50 moves each should be enough
+  
+ 
+(defn fast-tournament 
+"Same as tournament but without keeping history. If there is a winner, returns the winning direction
+otherwise returns the last board. Intended to be used with genetic training." 
+[sb d p1 p2]
+(reduce 
+  (fn [board player]
+    (if-let [win-dir (jit-referee board)] (reduced (if (= win-dir (:direction p1)) p1 p2))
+    (->> player
+          (:brain)
+          (chess-best-move (:direction player) board d)
+          (:move)
+          (core/try-move)))) 
+ sb (take 100 (cycle [p1 p2])))) ;;50 moves each should be enough
+  
+(defn ga-fitness*
+"Scores p1 after competing with p2 starting with board b." 
+[b d fast? p1 p2]
+(let [winner ((if fast? fast-tournament tournament) b d p1 p2)]
+(condp #(= winner %)
+       (:direction p1)  1 ;reward p1 with 1 point
+       (:direction p2) -2 ;penalise p1 with -2 points
+:else 0)))         ;give 0 points - noone won
+
+(def ga-fitness (partial ga-fitness* (start-chess! false) #_(core/starting-board details) (:pref-depth details) true)) 
+
+(defn generate-player 
+"Constructs a Player object given a brain b (a neural-net) and a direction dir." 
+ [brain dir]
+(Player. 
+   (fn [leaf _] ;;ignore 2nd arg - we already have direction
+     (let [normals (anormalise (neural-input leaf dir false))
+           output  (double-array 1)] 
+     (do (.compute brain normals output) (aget output 0)))) dir))     
 
 ;(ut/data->string buffered-moves "performance.cheat") 
 (def buffered-moves (ut/string->data "performance.cheat"))  ;it's faster to read them from file than recalculate       
 
 (defn -main 
 "Starts a graphical (swing) Chess game." 
-[& args]  
-(gui/show-gui! details)
+[& args]
+(CustomNeuralGeneticAlgorithm. brain (evol/randomizer :nguyen-widrow)  (Referee.) 10 0.2 0.1)
+
+#_(tournament (start-chess! false) 4 
+  (Player. chess-best-move -1 core/score-chess-naive) 
+  (Player. chess-rand-move 1 ))
+#_(let [ni (neural-input (start-chess! false) -1 true)
+      no (neural-output ni)]  
+(normalize-fields ni no))
+(anormalise (neural-input (start-chess! false) -1 false)) ;;quick and easy way is preferred
+;(gui/show-gui! details)
 #_(time (s/go -1 (start-chess! false) 4) #_(println @s/mmm))
 #_(time (do (s/go -1 (start-chess! false) 4) (println @s/mmm))) 
 )
