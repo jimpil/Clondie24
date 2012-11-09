@@ -21,8 +21,13 @@
 (def knobs "Various knobs for the gui. Better keep them together."
 (atom brand-new))
       
-(defmacro knob! [k nv]
-`(swap! knobs assoc ~k ~nv))     
+(definline knob! [k nv]
+`(swap! knobs assoc ~k ~nv)) 
+
+(defmacro with-block [& blocking-jobs]
+`(try (knob! :block? true)  ~@blocking-jobs
+ (catch Exception e# (.getMessage e#)) 
+ (finally (knob! :block? false))))    
 
 (def curr-game (promise))
 
@@ -54,27 +59,26 @@
  3 auxilliary slots are provided in knobs in case you need some."
  [c job storage-key] 
 `(do (ssw/config! ~c :cursor :wait)
-  (future (if (nil? ~storage-key) ~job
-  (do (knob! ~storage-key ~job) 
+  (future (if (nil? ~storage-key) (with-block ~job)
+  (do (knob! ~storage-key (with-block ~job)) 
       (ssw/invoke-later (ssw/repaint! ~c) 
                         (ssw/config! ~c :cursor :default)
-                        (knob! :block? false)
                         (.. Toolkit getDefaultToolkit beep)))))))
       
 
 (defn clear! "Clears everything (history and current board)." [] 
 (do (reset-knobs!)
 (->  @curr-game
-     (:board-atom)
+     :board-atom
      (reset! (peek (core/clear-history!))))) ) ;(peek []) = nil
     
 (defn undo! "Go back a state." []
 (->  @curr-game
-     (:board-atom)
+     :board-atom
      (reset! (peek (core/undo!)))))    
 
 (defn balance [how]
-(condp = how
+(case how
    :up   (partial * 50)
    :down (comp int #(/ % 50))))
 
@@ -82,8 +86,8 @@
 "Returns the piece that corresponds to the coordinates on this board." 
 [m b cl-coords]
 (let [balancer (balance :down)
-      r-ids (map balancer cl-coords)
-      l-pos (core/translate-position (first r-ids) (second r-ids) m)
+      [bx by] (map balancer cl-coords)
+      l-pos (core/translate-position bx by m)
       f-piece (get b l-pos)]
 (when-not (nil? f-piece) f-piece)))
 
@@ -111,7 +115,7 @@
                         :key  "menu L")
       a-quit (ssw/action :handler (fn [e] (System/exit 0)) 
                         :name "Quit" 
-                        :tip  "Exit Clondie24" 
+                        :tip  "Close arena" 
                         :key  "menu Q")                  
       a-pref (ssw/action :handler (fn [e] (ssw/alert "Not implemented!")) 
                         :name "Preferences" 
@@ -204,9 +208,9 @@
        (refresh :whose-turn (turn (get-in @knobs [:selection :direction]))
                 :highlighting? false
                 :hint nil
-                :selection nil)
+                :selection nil);;;;;;;;;;;;
        (ssw/repaint! canvas)
-       (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))))))
+       (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))))))      
             
  
 (def canvas "The paintable canvas - our board"
@@ -245,7 +249,7 @@
                                                                          :hint nil) 
                                                                 (ssw/repaint! canvas))))]) [:fill-h 10]
                         (ssw/button :text "Hint" :listen [:action (fn [e] (when-not (:block? @knobs)
-                                                     (do (refresh :highlighting? false) 
+                                                     (do (knob! :highlighting? false) 
                                                          (with-busy-cursor canvas 
                                                           (hint (:pref-depth @curr-game)) :hint))))]) [:fill-h 10]])
                :center canvas
@@ -254,10 +258,9 @@
                
 (defn hint "Ask the computer for a hint." 
 [depth] 
-(when-not (:block? @knobs) ;ONLY IF NOT 'THINKING'
-(do (refresh :block? true) 
- (apply (:hinter @curr-game) 
-          (list (get-in @knobs [:selection :direction]) (peek @core/board-history) depth)))))
+ ((:hinter @curr-game) 
+          (get-in @knobs [:selection :direction]) 
+          (peek @core/board-history) depth (:naive-scorer @curr-game)))
           
 
 (defn set-laf! "Set look and feel of the ui, provided its name as a string."  
@@ -296,17 +299,17 @@
        (ssw/repaint! canvas)))))
 
 
-(defmacro change 
+(defn resize! 
 "Handy macro for resizing the frame outside the gui when we don't have access to swing." 
 [f w h]
-`(ssw/config! ~f :size [~w :by ~h]))
+(ssw/config! f :size [w :by h]))
      
                                                        
 (defn show-gui! "Everything starts from here." [game-map] 
-  (do  (set-laf! "Nimbus") ;try to look nice
-       (deliver curr-game game-map) ;firstly make the gui aware of what game we want it to display
-       (ssw/invoke-later 
-          (doto (arena) ssw/show!))))
+ (set-laf! "Nimbus") ;try to look nice
+  (deliver curr-game game-map) ;firstly make the gui aware of what game we want it to display
+   (ssw/invoke-later 
+     (doto (arena) ssw/show!)))
                                                 
                
         
