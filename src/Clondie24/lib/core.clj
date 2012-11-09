@@ -108,10 +108,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
       old-pos  (getListPosition p)
       new-pos  (getListPosition newPiece)]            
 (-> board 
-     (transient)  
-     (assoc! old-pos nil) 
-     (assoc! new-pos newPiece)
-     (persistent!)
+     ;(transient)  
+     (assoc old-pos nil 
+            new-pos newPiece) 
+     ;(assoc! )
+     ;(persistent!)
      #_(populate-board))) ;replace dead-pieces with nils
 #_(throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!"))))
 
@@ -210,12 +211,12 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
        def-prec#  (some #(when (and (= ~precious (:rank %)) 
                                     (= dir# (:direction %))) %) next-b#)]
 (some #(threatens? def-prec# % next-b#) 
-   (into [] (gather-team next-b# (unchecked-negate dir#)))))))
+  (into [] (gather-team next-b# (unchecked-negate dir#)))))))
 
 
 (defn score-chess-naive ^double [b dir]
  (let [hm (gather-team b dir) ;fixed bug
-       aw (gather-team b (unchecked-negate dir))]
+       aw (gather-team b (- dir))]
  (- (r/reduce + (r/map :value hm)) 
     (r/reduce + (r/map :value aw)))))    
 
