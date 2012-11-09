@@ -36,7 +36,21 @@
         max-arg-count (apply max  (map #(count (.getParameterTypes ^java.lang.reflect.Constructor %))
                                        (.getConstructors recordclass)))
         args (map #(symbol (str "x" %)) (range max-arg-count))]
-    (eval `(fn [~@args] (new ~(symbol recordname) ~@args))))) 
+    (eval `(fn [~@args] (new ~(symbol recordname) ~@args)))))
+    
+(defn scaffold
+"Given an interface (or a class), returns a hollow body to use with 'deftype'." 
+ [iface]
+  (doseq [[iface methods] (->> iface .getMethods 
+                            (map #(vector (.getName (.getDeclaringClass %)) 
+                                    (symbol (.getName %))
+                                    (count (.getParameterTypes %))))
+                            (group-by first))]
+    (println (str "  " iface))
+    (doseq [[_ name argcount] methods]
+      (println 
+        (str "    " 
+          (list name (into ['this] (take argcount (repeatedly gensym)))))))))     
     
       
 (defmacro with-captured-inputs 
@@ -128,14 +142,16 @@
       (deref (:board-atom game))))  ;the rows
 
 (defn serialize! 
-"Serialize the object b on to the disk using Java serialization. Filename needs no extension - it will be appended (.ser)."
+"Serialize the object b on to the disk using Java serialization. 
+ Filename needs no extension - it will be appended (.ser)."
 [b fname]
 (with-open [oout (java.io.ObjectOutputStream. 
                  (java.io.FileOutputStream. (str fname ".ser")))]
                  (.writeObject oout b)))
                 
 (defn deserialize! 
-"Deserializes the object  in file f from the disk using Java serialization. Filename needs no extension - it will be appended (.ser)." 
+"Deserializes the object  in file f from the disk using Java serialization. 
+ Filename needs no extension - it will be appended (.ser)." 
 ^clojure.lang.PersistentVector [fname]
 (let [^clojure.lang.PersistentVector upb (promise)] ;waiting for the value shortly
   (with-open [oin (java.io.ObjectInputStream. 
@@ -151,7 +167,7 @@
 (defn string->data
 "Read the file f back on memory safely. Contents of f should be a clojure data-structure." 
 [f]
-(io!
+(io! ;;throw if in transaction
  (binding [*read-eval* false]
  (read-string (slurp f)))))                            
 
