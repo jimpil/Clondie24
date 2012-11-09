@@ -51,11 +51,10 @@
      (transient)  
      (assoc! old-pos nil) 
      (assoc! new-pos newPiece) 
-     (assoc! (let [between (ut/walk (ut/resolve-direction (:position p) coords) (:position p))]  ;the piece in between
-                (core/translate-position
-                 (first between) (second between) board-mappings-checkers)) nil)
+     (assoc! (let [[bx by] (ut/walk (ut/resolve-direction (:position p) coords) (:position p))]  ;the piece in between
+                (core/translate-position bx by board-mappings-checkers)) nil)
      (persistent!)))
-(core/move board p coords))) ;;use the core one if there is no kill
+(core/move board p coords))) ;;use the one from core if there is no kill
 
      
      
@@ -70,9 +69,9 @@
  core/Piece 
  (update-position [this np] (if (and (= (second np) (get prince-row direction))
                                      (= rank 'soldier)) (core/promote this np) 
-                                (CheckersPiece. image np rank value direction {:alive true} nil)))
+                                (->CheckersPiece image np rank value direction {:alive true} nil)))
  (die     [this] (vary-meta this assoc :alive false)) ;communicate death through meta-data 
- (promote [this np] (CheckersPiece. (get-in checkers-images [:prince direction]) np 'prince 3 direction {:alive true} nil)) ; a checker is promoted to prince (king)
+ (promote [this np] (->CheckersPiece (get-in checkers-images [:prince direction]) np 'prince 3 direction {:alive true} nil)) ; a checker is promoted to prince (king)
  (getListPosition [this] (core/translate-position  (first  position) 
                                                    (second position) board-mappings-checkers))
  (getPoint [this] (ut/make-point position))

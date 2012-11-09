@@ -18,7 +18,7 @@
 (def previous-move (atom nil))  ;will need this for en-passant
 (def state-dependent-moves (atom {:castling nil 
                                   :en-passant nil})) 
-(defrecord Player [brain ^int direction])
+(defrecord Player [brain ^int direction searcher])
                                  
 
 (def chess-images "All the chess images paired up according to rank."
@@ -51,7 +51,7 @@
 (definline chess-best-move [dir b n scorer] 
 `(s/go ~dir ~b ~n ~scorer))
 
-(defn chess-rand-move [dir b _]
+(defn chess-rand-move [dir b _ _] ;;need same arity as 'chess-best-move'
 (let [all-moves (into [] (core/team-moves b dir core/move true))]
 {:move (get all-moves (rand-int (count all-moves)))})) 
 
@@ -175,7 +175,7 @@
                :players 2 
                :chunking 2
                :images chess-images
-               :characteristics [:image :position :rank :value]      
+               :characteristics [:image :position :rank :value :direction]      
                :board-size 64 
                :total-pieces 32
                :rel-values rel-values
@@ -227,7 +227,6 @@
                ((keyword %) (:rel-values details)) nil)) 
       ['rook 'knight 'bishop 'queen 'king])))))))
       
-(defn neural-input )
       
 (defn neural-input "Returns 64 inputs for the neural net." 
 [b dir fields?]
@@ -248,52 +247,77 @@
 
 (defn tournament
 "Starts a tournament between the 2 players (p1, p2). If there is no winner, returns the entire history (vector) of 
- the tournament after 100 moves. If there is a winner, a 2d vector will be returned containing both the history and the winner." 
-[sb depth p1 p2]
+ the tournament after 100 moves. If there is a winner, a 2d vector will be returned containing both the history(1st item) 
+ and the winner (2nd item)." 
+[sb depth p1 p2 & {:keys [limit]
+                   :or   {limit 100}}]
 (reduce 
   (fn [history player] 
   (let [cb (peek history) 
         win-dir (jit-referee cb)]
     (if win-dir (reduced (vector history (if (= win-dir (:direction p1)) p1 p2)))
-    (conj history (-> ((:brain player) (:direction player) cb depth) ;TODO
-                      (:move)
-                      (core/try-move)))))) 
- [sb] (take 100 (cycle [p1 p2])))) ;;50 moves each should be enough
+    (conj history (->> player
+                      :brain
+                      ((:searcher player) (:direction player) cb depth) 
+                      :move
+                      core/try-move))))) 
+ [sb] (take limit (cycle [p1 p2])))) ;;100 moves each should be enough
   
  
 (defn fast-tournament 
 "Same as tournament but without keeping history. If there is a winner, returns the winning direction
 otherwise returns the last board. Intended to be used with genetic training." 
-[sb d p1 p2]
+[sb d p1 p2 & {:keys [limit]
+               :or   {limit 100}}]
 (reduce 
   (fn [board player]
     (if-let [win-dir (jit-referee board)] (reduced (if (= win-dir (:direction p1)) p1 p2))
     (->> player
-          (:brain)
-          (chess-best-move (:direction player) board d)
-          (:move)
-          (core/try-move)))) 
- sb (take 100 (cycle [p1 p2])))) ;;50 moves each should be enough
+          :brain
+          ((:searcher player) (:direction player) board d)
+          :move
+           core/try-move))) 
+ sb (take limit (cycle [p1 p2])))) ;;50 moves each should be enough
   
 (defn ga-fitness*
 "Scores p1 after competing with p2 starting with board b." 
-[b d fast? p1 p2]
+([b d fast? p1 p2]
 (let [winner ((if fast? fast-tournament tournament) b d p1 p2)]
 (condp #(= winner %)
        (:direction p1)  1 ;reward p1 with 1 point
        (:direction p2) -2 ;penalise p1 with -2 points
-:else 0)))         ;give 0 points - noone won
+:else 0))))               ;give 0 points - noone won
+         
 
-(def ga-fitness (partial ga-fitness* (start-chess! false) #_(core/starting-board details) (:pref-depth details) true)) 
+(defn ga-fitness [] 
+(partial ga-fitness* (start-chess! false) (:pref-depth details) true)) 
 
-(defn generate-player 
+(defn ga 
+[brain pop-size & {:keys [randomizer to-mate to-mutate thread-no]
+                   :or {randomizer (evol/randomizer :nguyen-widrow)
+                        to-mate   0.2
+                        to-mutate 0.1
+                        thread-no 10}}]
+(doto 
+ (CustomNeuralGeneticAlgorithm. brain randomizer  (Referee.) pop-size to-mate to-mutate)
+ (.setThreadCount thread-no)))
+
+(defn neural-player 
 "Constructs a Player object given a brain b (a neural-net) and a direction dir." 
- [brain dir]
+ [^org.encog.neural.networks.BasicNetwork brain dir]
 (Player. 
    (fn [leaf _] ;;ignore 2nd arg - we already have direction
      (let [normals (anormalise (neural-input leaf dir false))
            output  (double-array 1)] 
-     (do (.compute brain normals output) (aget output 0)))) dir))     
+     (do (.compute brain normals output)
+         (aget output 0))))
+ dir chess-best-move)) 
+     
+(defn random-player [dir]
+(Player. core/score-chess-naive dir chess-rand-move)) 
+
+(defn naive-player [dir]
+(Player. core/score-chess-naive dir chess-best-move))        
 
 ;(ut/data->string buffered-moves "performance.cheat") 
 (def buffered-moves (ut/string->data "performance.cheat"))  ;it's faster to read them from file than recalculate       
@@ -301,15 +325,15 @@ otherwise returns the last board. Intended to be used with genetic training."
 (defn -main 
 "Starts a graphical (swing) Chess game." 
 [& args]
-(CustomNeuralGeneticAlgorithm. brain (evol/randomizer :nguyen-widrow)  (Referee.) 10 0.2 0.1)
-
-#_(tournament (start-chess! false) 4 
-  (Player. chess-best-move -1 core/score-chess-naive) 
-  (Player. chess-rand-move 1 ))
+#_(ga brain 10)
+(fast-tournament (start-chess! false) 4 
+  (neural-player brain -1)
+  ;(random-player -1) 
+  (naive-player 1) :limit 20)
 #_(let [ni (neural-input (start-chess! false) -1 true)
       no (neural-output ni)]  
 (normalize-fields ni no))
-(anormalise (neural-input (start-chess! false) -1 false)) ;;quick and easy way is preferred
+;(anormalise (neural-input (start-chess! false) -1 false)) ;;quick and easy way is preferred
 ;(gui/show-gui! details)
 #_(time (s/go -1 (start-chess! false) 4) #_(println @s/mmm))
 #_(time (do (s/go -1 (start-chess! false) 4) (println @s/mmm))) 
