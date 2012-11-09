@@ -3,7 +3,11 @@
                 [clojure.core.reducers :as r]))
 
 (set! *unchecked-math* true) 
-(def cpus-no (.. Runtime getRuntime availableProcessors)) ;may need it               
+(def cpus-no (.. Runtime getRuntime availableProcessors)) ;may need it
+  
+(defn set-parallelism [x] 
+ (alter-var-root #'r/pool 
+  (constantly (java.util.concurrent.ForkJoinPool. (int x)))))             
       
 (def curr-game "Before any searching we need a game-map." (promise))
 (declare score-by-count score-naive next-level)
@@ -38,14 +42,14 @@
              (successors-fn board dir))))
 
     
-(defn search "The recursion of min-max algorithm." 
+(defn search "The recursive bit of the min-max algorithm." 
 [eval-fn tree depth]
-(letfn [(minimize ^double [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
+(letfn [(minimize  [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-min 
-                                  (r/map #(maximize (:tree %) (dec d)) (:children tree)))))
-        (maximize ^double [tree d] (if(zero? d) (eval-fn (:root tree) (:direction tree))
+                                  (r/map (fn [child] (maximize (:tree child) (dec d))) (:children tree)))))
+        (maximize  [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-max   
-                                   (r/map #(minimize (:tree %) (dec d)) (:children tree)))))] 
+                                   (r/map (fn [child] (minimize (:tree child) (dec d))) (:children tree)))))] 
 (minimize tree (int depth))))    
     
 
@@ -66,7 +70,7 @@
 
 (defn go [^long dir b ^long d scorer]
 (let [successors (into [] (:children (game-tree dir b next-level)))]
-  (if (= 1 (count successors)) (first successors)     
+  (if (= 1 (count successors)) (first successors)   ;;mandatory move detected - just return it  
 (r/fold (:chunking @curr-game) best best ;2 = best so far
  (r/map #(Move-Value. (:move %) (search scorer (:tree %) (dec d))) ;starting from children so decrement depth
                     successors )))))
