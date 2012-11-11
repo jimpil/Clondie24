@@ -73,19 +73,19 @@
 (let [pos (:position p)            ;[[x y] (:position p) 
       r (keyword (:rank p))
       d (:direction p)]      
-(apply (r chess-moves) pos))) ;will return a fn which is called with current x and y 
+((r chess-moves) pos))) ;will return a fn which is called with current x and y 
 ;(if (= (class p) (Class/forName "Clondie24.games.chess.ChessPiece2"))
 ;(ut/Point->Vec pos) pos))))  
                                               
 
 (defn start-chess! [fast?] 
 "Start a chess-game. Returns the starting-board."
-(do (core/clear-history!) ;empty board-history
+ (core/clear-history!) ;empty board-history
     (deliver s/curr-game details)
     (reset! current-chessItems
   (if fast? (into-array  (core/starting-board details))
                          (core/starting-board details)))
-    ));mandatory before game starts 
+  );mandatory before game starts 
     
 (definline jit-referee ;just-in-time referee
 "Inspects the board for missing kings. If no team is missing its king returns nil (no winner),
@@ -124,8 +124,8 @@
                              (core/collides? (core/dest->Move b this % (:mover details)) 
                                  (ut/make-walker 
                                  (ut/resolve-direction position %) rank) b board-mappings-chess)
-                            (core/exposes? (core/dest->Move b this % (:mover details)) (if with-precious? 'king nil)))    
-                  (if (= rank 'pawn) (apply ((keyword rank) chess-moves) (list b x y direction))                               
+                            (core/exposes? (core/dest->Move b this % (:mover details)) (when with-precious? 'king)))    
+                  (if (= rank 'pawn) (((keyword rank) chess-moves)  b x y direction)                               
                     (get-in buffered-moves [(core/translate-position x y board-mappings-chess) 
                                             (keyword rank)]))))) ;returns a list of points [x y]
  Object
@@ -176,7 +176,10 @@
                :chunking 2
                :images chess-images
                :characteristics [:image :position :rank :value :direction]      
-               :board-size 64 
+               :board-size 64
+               :tile-size 50
+               :alternating-colours [(ut/hex->color '0xffdead) ;funny colour name!
+                                     (ut/hsb->color 0.931 0.863 0.545)] 
                :total-pieces 32
                :rel-values rel-values
                :obligatory-move nil
@@ -231,7 +234,9 @@
 (defn neural-input "Returns 64 inputs for the neural net." 
 [b dir fields?]
 ((if fields? norm/input identity) 
-  (for [t b] (if (nil? t) 0 (* dir (:direction t) (:value t)))))) ;or maybe :direction instead of :value? 
+  (for [t b] 
+  (if (nil? t) 0 
+   (* dir (:direction t) (:value t)))))) ;or maybe :direction instead of :value? 
   
 (definline neural-output "Creates output-field based on this InputField." 
 [inputs] 
@@ -252,7 +257,7 @@
 [sb depth p1 p2 & {:keys [limit]
                    :or   {limit 100}}]
 (reduce 
-  (fn [history player] 
+ (fn [history player] 
   (let [cb (peek history) 
         win-dir (jit-referee cb)]
     (if win-dir (reduced (vector history (if (= win-dir (:direction p1)) p1 p2)))
@@ -309,12 +314,12 @@ otherwise returns the last board. Intended to be used with genetic training."
    (fn [leaf _] ;;ignore 2nd arg - we already have direction
      (let [normals (anormalise (neural-input leaf dir false))
            output  (double-array 1)] 
-     (do (.compute brain normals output)
-         (aget output 0))))
+     (.compute brain normals output)
+     (aget output 0)))
  dir chess-best-move)) 
      
 (defn random-player [dir]
-(Player. core/score-chess-naive dir chess-rand-move)) 
+(Player. nil dir chess-rand-move)) 
 
 (defn naive-player [dir]
 (Player. core/score-chess-naive dir chess-best-move))        
