@@ -16,6 +16,13 @@
  [0 5] [1 5] [2 5] [3 5] [4 5] [5 5] [6 5] [7 5]
  [0 6] [1 6] [2 6] [3 6] [4 6] [5 6] [6 6] [7 6]
  [0 7] [1 7] [2 7] [3 7] [4 7] [5 7] [6 7] [7 7]])
+ 
+ (def ^:const mappings-3x3
+"A vector of vectors. Outer vector represents the 9 (serial) positions tic-tac-toe-items can position themselves on. 
+ Each inner vector represents the coordinates of that position on the 3x3 grid."
+ [[0 0] [1 0] [2 0]
+  [0 1] [1 1] [2 1]
+  [0 2] [1 2] [2 2]])
 
 (def board-history 
 "Log of the state of a game." 
@@ -122,9 +129,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (let [old-pos  (getListPosition p)
       mutPiece (update-position p coords) ;the mutated piece 
       new-pos  (getListPosition mutPiece)] 
-(do
      (aset  board old-pos nil) ;^"[LClondie24.games.chess.ChessPiece2;"
-     (aset  board new-pos mutPiece) board)))
+     (aset  board new-pos mutPiece) board))
 
 (defrecord Move [p mover ^clojure.lang.PersistentVector end-pos]
  Movable
@@ -164,7 +170,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (definline team-moves "Filters all the moves for the team with direction 'dir' on this board b. Returns a reducer." 
 [b dir mover exposes-check?]
 `(let [team# (gather-team ~b ~dir) 
-       tmvs# (r/mapcat (fn [p#] (r/map #(dest->Move ~b p# % ~mover) (getMoves p# ~b ~exposes-check?))) team#)]
+       tmvs# (r/mapcat 
+                  (fn [p#] 
+                    (r/map #(dest->Move ~b p# % ~mover) 
+                            (getMoves p# ~b ~exposes-check?))) team#)]
  tmvs# ))
 
 
@@ -175,7 +184,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  (nil? 
   (get b (translate-position x y m))))) 
   
-(defn occupied? [m b pos]
+(def occupied?
 (complement vacant?))   
  
 (definline bury-dead [c]
