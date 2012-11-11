@@ -50,7 +50,7 @@
     (doseq [[_ name argcount] methods]
       (println 
         (str "    " 
-          (list name (into ['this] (take argcount (repeatedly gensym)))))))))     
+          (list name (into ['this] (repeatedly argcount gensym))))))))     
     
       
 (defmacro with-captured-inputs 
@@ -76,6 +76,13 @@
 
 (defn round-to-int [n] 
 (Math/round (float n)))
+
+(defn balance
+([how] (balance how 50))
+([how how-much] 
+ (case how
+      :up   (partial * how-much)
+      :down (comp int #(/ % how-much)))))
     
 (defn vector-of-doubles [v]
 (if (every? double? v) v
@@ -221,8 +228,8 @@
 (def walk (memoize walk*))          
 
 (defn make-walker [direction rank]
-(if (= rank 'knight) nil ;;knight jumps doesn't walk
- #(walk direction %)))
+(when-not (= rank 'knight) ;;knight jumps - doesn't walk'
+  #(walk direction %)))
                    
           
 (definline resolve-direction 
