@@ -78,8 +78,7 @@
  (getMoves [this b _] 
                   (let [[x y] position]
                   ;(map #(with-meta % {:jump? (jump? position %)}) 
-                   (-> ((keyword rank) checkers-moves) 
-                         (apply (list b x y direction)))))
+                   (((keyword rank) checkers-moves) b x y direction)))
  Object
  (toString [this] 
    (println "Checker (" rank ") at position:" (core/getListPosition this) " ->" position)) )
@@ -88,11 +87,11 @@
 "Will construct a set of initial checkers (12). opponent? specifies the side of the board where the pieces should be placed (true for north false for south)." 
 [opponent?]           
 (if opponent?               
-(map #(if (nil? %) nil 
+(map #(when-not (nil? %) 
          (CheckersPiece. (get-in checkers-images [:soldier 1])
          (core/translate-position % board-mappings-checkers) 'soldier 1 1 {:alive true} nil)) 
           '(nil 1 nil 3 nil 5 nil 7 8 nil 10 nil 12 nil 14 nil nil 17 nil 19 nil 21 nil 23))
-(map #(if (nil? %) nil 
+(map #(when-not (nil? %)  
           (CheckersPiece. (get-in checkers-images [:soldier -1]) 
           (core/translate-position % board-mappings-checkers) 'soldier 1 -1 {:alive true} nil))
           '(40 nil 42 nil 44 nil 46 nil nil 49 nil 51 nil 53 nil 55 56 nil 58 nil 60 nil 62 nil)))) 
@@ -106,12 +105,12 @@
  
 (defn start-checkers! [fast?] 
 "Start a chess-game. Returns the starting-board."
-(do (core/clear-history!) ;empty board-history
-    (deliver s/curr-game details)
-    (reset! current-checkers
+(core/clear-history!) ;empty board-history
+  (deliver s/curr-game details)
+  (reset! current-checkers
   (if fast? (into-array  (core/starting-board details))
                          (core/starting-board details)))
-    ));mandatory before game starts 
+ );mandatory before game starts 
                       
 (defn score-by-count  [b dir] 
 (let [ hm (into [] (core/gather-team b dir))
@@ -128,7 +127,10 @@
                :chunking 1
                :images checkers-images
                :characteristics [:image :position :rank :value :direction]  
-               :board-size 64 
+               :board-size 64
+               :tile-size 50 
+               :alternating-colours [(ut/hex->color '0xffdead) ;funny colour name!
+                                     (ut/hsb->color 0.931 0.863 0.545)] 
                :total-pieces 48 ;24 ;;temporary hack
                :obligatory-move 'jump
                :rel-values {:soldier 1 :prince 3}
