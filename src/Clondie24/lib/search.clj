@@ -5,7 +5,7 @@
 (set! *unchecked-math* true) 
 (def cpus-no (.. Runtime getRuntime availableProcessors)) ;may need it
   
-(defn set-parallelism [x] 
+(defn set-parallelism! [x] 
  (alter-var-root #'r/pool 
   (constantly (java.util.concurrent.ForkJoinPool. (int x)))))             
       
@@ -16,8 +16,6 @@
 (defrecord Move->Tree  [move tree])
 (defrecord Move->Board [move board])
 (defrecord Move-Value  [move value])
-
-(def mmm (atom 0))
 
 (defn best 
 ([]    nil)
@@ -42,7 +40,7 @@
              (successors-fn board dir))))
 
     
-(defn search "The recursive bit of the min-max algorithm." 
+(defn search "The recursion of the min-max algorithm." 
 [eval-fn tree depth]
 (letfn [(minimize  [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-min 
