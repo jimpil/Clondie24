@@ -35,28 +35,28 @@
   (conde  
      [(= y 1) (= nil (get boa (try (translate-position x (+ y 2) m) (catch Exception e -1)))) 
       (== a x) (== b (+ y 2))] ;1st possibility (2 steps)
-     [(< (+ y 1) ymax) (= nil (get boa (try (translate-position x (+ y 1) m) (catch Exception e -1))))  
-      (== a x) (== b (+ y 1))] ;2nd possibility (1 step)
-     [(< (+ y 1) ymax) (< (+ x 1) xmax) (!= nil (get boa (try (translate-position (+ x 1) (+ y 1) m) (catch Exception e -1))))
-      (!= dir (:direction (get boa (try (translate-position (+ x 1) (+ y 1) m) (catch Exception e -1))))) 
-      (== a (+ x 1)) (== b (+ y 1))] ;kill
-     [(< (+ y 1) ymax) (>= (- x 1) 0)  (!= nil (get boa (try (translate-position (- x 1) (+ y 1) m) (catch Exception e -1)))) 
-      (!= dir (:direction (get boa (try (translate-position (- x 1) (+ y 1) m) (catch Exception e -1))))) 
-      (== a (- x 1)) (== b (+ y 1))]) ;kill 
+     [(< (inc y) ymax) (= nil (get boa (try (translate-position x(inc y) m) (catch Exception e -1))))  
+      (== a x) (== b (inc y))] ;2nd possibility (1 step)
+     [(< (inc y) ymax) (< (inc x) xmax) (!= nil (get boa (try (translate-position (inc x) (inc y) m) (catch Exception e -1))))
+      (!= dir (:direction (get boa (try (translate-position (inc x) (inc y) m) (catch Exception e -1))))) 
+      (== a (inc x)) (== b (inc y))] ;kill
+     [(< (inc y) ymax) (>= (dec x) 0)  (!= nil (get boa (try (translate-position (dec x) (inc y) m) (catch Exception e -1)))) 
+      (!= dir (:direction (get boa (try (translate-position (dec x) (inc y) m) (catch Exception e -1))))) 
+      (== a (dec x)) (== b (inc y))]) ;kill 
     (== q [a b])))
   (run* [q] ;else moving north
   (fresh [a b]
   (conde  
     [(= y 6) (= nil (get boa (try (translate-position x (- y 2) m) (catch Exception e -1)))) 
      (== a x) (== b (- y 2))]  ;1st possibility (2 steps)
-    [(>= (- y 1) 0) (= nil (get boa (try (translate-position x (- y 1) m) (catch Exception e -1)))) 
-     (== a x) (== b (- y 1))]  ;2nd possibility (1 step)
-    [(>= (- y 1) 0) (< (+ x 1) xmax) (!= nil (get boa (try (translate-position (+ x 1) (- y 1) m) (catch Exception e -1))))
-     (!= dir (:direction (get boa (try (translate-position (+ x 1) (- y 1) m) (catch Exception e -1)))))
-      (== a (+ x 1)) (== b (- y 1))] ;kill
-    [(>= (- y 1) 0) (>= (- x 1) 0) (!= nil (get boa (try (translate-position (- x 1) (- y 1) m) (catch Exception e -1))))  
-    (!= dir (:direction (get boa (try (translate-position (- x 1) (- y 1) m) (catch Exception e -1))))) 
-    (== a (- x 1)) (== b (- y 1))]) ;kill
+    [(>= (dec y) 0) (= nil (get boa (try (translate-position x (dec y) m) (catch Exception e -1)))) 
+     (== a x) (== b (dec y))]  ;2nd possibility (1 step)
+    [(>= (dec y) 0) (< (inc x) xmax) (!= nil (get boa (try (translate-position (inc x) (dec y) m) (catch Exception e -1))))
+     (!= dir (:direction (get boa (try (translate-position (inc x) (dec y) m) (catch Exception e -1)))))
+      (== a (inc x)) (== b (dec y))] ;kill
+    [(>= (dec y) 0) (>= (dec x) 0) (!= nil (get boa (try (translate-position (dec x) (dec y) m) (catch Exception e -1))))  
+    (!= dir (:direction (get boa (try (translate-position (dec x) (dec y) m) (catch Exception e -1))))) 
+    (== a (dec x)) (== b (dec y))]) ;kill
     (== q [a b]))))))
     
     
@@ -68,20 +68,20 @@
   (run* [q] 
    (fresh [a b] 
     (conde 
-     [(< (+ y 1) ymax) (< (+ x 1) xmax) (== a (+ x 1)) (== b (+ y 1))
-                       (= nil (get boa (try  (translate-position (+ x 1) (+ y 1) m) 
+     [(< (inc y) ymax) (< (inc x) xmax) (== a (inc x)) (== b (inc y))
+                       (= nil (get boa (try  (translate-position (inc x) (inc y) m) 
                                        (catch Exception e -1))))] ;landing pos must be vacant
-     [(< (+ y 1) ymax) (>= (- x 1) 0) (== a (- x 1)) (== b (+ y 1))
-                       (= nil (get boa (try (translate-position (- x 1) (+ y 1)  m)
+     [(< (inc y) ymax) (>= (dec x) 0) (== a (dec x)) (== b (inc y))
+                       (= nil (get boa (try (translate-position (dec x) (inc y)  m)
                                        (catch Exception e -1))))] ;landing pos must be vacant
                        
      [(< (+ y 2) ymax) (< (+ x 2) xmax) (== a (+ x 2)) (== b (+ y 2))  ;attacking
-                       (= (:direction (get boa (try (translate-position (+ x 1) (+ y 1)  m)
+                       (= (:direction (get boa (try (translate-position (inc x) (inc y)  m)
                                                (catch Exception e 0)))) (- dir))  ; pos in between must be enemy
                        (= nil  (get boa (try (translate-position (+ x 2) (+ y 2)  m)
                                         (catch Exception e -1))))] ;landing pos must be vacant
      [(< (+ y 2) ymax) (>= (- x 2) 0) (== a (- x 2)) (== b (+ y 2))  ;attacking
-                       (= (:direction (get boa (try (translate-position (- x 1) (+ y 1)  m)
+                       (= (:direction (get boa (try (translate-position (dec x) (inc y)  m)
                                                (catch Exception e 0)))) (- dir))   ; pos in between must be enemy
                        (= nil  (get boa (try (translate-position (- x 2) (+ y 2)  m)
                                         (catch Exception e -1))))]) ;landing pos must be vacant
@@ -89,19 +89,19 @@
   (run* [q] 
    (fresh [a b ] 
     (conde 
-     [(>= (- y 1) 0) (< (+ x 1) xmax) (== a (+ x 1)) (== b (- y 1)) 
-                       (= nil (get boa (try (translate-position (+ x 1) (- y 1)  m)
+     [(>= (dec y) 0) (< (inc x) xmax) (== a (inc x)) (== b (dec y)) 
+                       (= nil (get boa (try (translate-position (inc x) (dec y)  m)
                                         (catch Exception e -1))))]   ;landing pos must be vacant
-     [(>= (- y 1) 0) (>= (- x 1) 0) (== a (- x 1)) (== b (- y 1))
-                       (= nil (get boa (try (translate-position (- x 1) (- y 1)  m)
+     [(>= (dec y) 0) (>= (dec x) 0) (== a (dec x)) (== b (dec y))
+                       (= nil (get boa (try (translate-position (dec x) (dec y)  m)
                                        (catch Exception e -1))))]   ;landing pos must be vacant
      [(>= (- y 2) 0) (< (+ x 2) xmax)  (== a (+ x 2)) (== b (- y 2))  ;attacking
-                       (= (:direction (get boa (try (translate-position (+ x 1) (- y 1)  m)
+                       (= (:direction (get boa (try (translate-position (inc x) (dec y)  m)
                                                (catch Exception e 0)))) (- dir)) ; pos in between must be enemy
                        (= nil (get boa (try (translate-position (+ x 2) (- y 2)  m)
                                        (catch Exception e -1))))]    ;landing pos must be vacant                  
      [(>= (- y 2) 0) (>= (- x 2) 0) (== a (- x 2)) (== b (- y 2))  ;attacking
-                         (= (:direction (get boa (try (translate-position (- x 1) (- y 1)  m)
+                         (= (:direction (get boa (try (translate-position (dec x) (dec y)  m)
                                                  (catch Exception e 0)))) (- dir)) ; pos in between must be enemy
                          (= nil  (get boa (try (translate-position (- x 2) (- y 2)  m)
                                           (catch Exception e -1))))])   ;landing pos must be vacant
@@ -136,14 +136,14 @@
  (run* [q]
  (fresh [a b]
   (conde 
-    [(< (+ x 1) xmax) (< (+ y 1) ymax) (== a (+ x 1)) (== b (+ y 1))] ;1st possibility (diagonally)
-    [(>= (- x 1) 0) (>= (- y 1) 0) (== a (- x 1)) (== b (- y 1))]     ;2nd possibility (diagonally)
-    [(< (+ y 1) ymax) (== a x) (== b (+ y 1))]                        ;3rd possibility (x is constant)
-    [(>= (- y 1) 0) (== a x) (== b (- y 1))]                          ;4th possibility (x is constant)
-    [(>= (- x 1) 0) (== b y) (== a (- x 1))]                          ;5th possibility (y is constant)
-    [(< (+ x 1) xmax) (== b y) (== a (+ x 1))]                        ;6th possibility (y is constant)
-    [(< (+ x 1) xmax) (> (- y 1) 0) (== a (+ x 1)) (== b (- y 1))]    ;7th possibility (diagonally)
-    [(>= (- x 1) 0) (< (+ y 1) ymax) (== a (- x 1)) (== b (+ y 1))]   ;8th possibility (diagonally)
+    [(< (inc x) xmax) (< (inc y) ymax) (== a (inc x)) (== b (inc y))] ;1st possibility (diagonally)
+    [(>= (dec x) 0) (>= (dec y) 0) (== a (dec x)) (== b (dec y))]     ;2nd possibility (diagonally)
+    [(< (inc y) ymax) (== a x) (== b (inc y))]                        ;3rd possibility (x is constant)
+    [(>= (dec y) 0) (== a x) (== b (dec y))]                          ;4th possibility (x is constant)
+    [(>= (dec x) 0) (== b y) (== a (dec x))]                          ;5th possibility (y is constant)
+    [(< (inc x) xmax) (== b y) (== a (inc x))]                        ;6th possibility (y is constant)
+    [(< (inc x) xmax) (>= (dec y) 0) (== a (inc x)) (== b (dec y))]    ;7th possibility (diagonally)
+    [(>= (dec x) 0) (< (inc y) ymax) (== a (dec x)) (== b (inc y))]   ;8th possibility (diagonally)
   ) 
    (== q [a b]))))) ;return each solution in a vector [x, y]
 
@@ -155,14 +155,14 @@
  (run* [q] ;bring back all possible solutions
  (fresh [a b]
   (conde ;;like OR
-    [(< (+ x 1) xmax) (< (+ y 2) ymax) (== a (+ x 1)) (== b (+ y 2))] ;1st possibility
-    [(< (+ x 2) xmax) (< (+ y 1) ymax) (== a (+ x 2)) (== b (+ y 1))] ;2nd possibility
-    [(< (+ x 2) xmax) (>= (- y 1)   0) (== a (+ x 2)) (== b (- y 1))] ;3rd possibility
-    [(< (+ x 1) xmax) (>= (- y 2)   0) (== a (+ x 1)) (== b (- y 2))] ;4th possibility
-    [(>= (- x 1)   0) (>= (- y 2)   0) (== a (- x 1)) (== b (- y 2))] ;5th possibility
-    [(>= (- x 2)   0) (>= (- y 1)   0) (== a (- x 2)) (== b (- y 1))] ;6th possibility
-    [(>= (- x 2)   0) (< (+ y 1) ymax) (== a (- x 2)) (== b (+ y 1))] ;7th possibility
-    [(>= (- x 1)   0) (< (+ y 2) ymax) (== a (- x 1)) (== b (+ y 2))] ;8th possibility
+    [(< (inc x) xmax) (< (+ y 2) ymax) (== a (inc x)) (== b (+ y 2))] ;1st possibility
+    [(< (+ x 2) xmax) (< (inc y) ymax) (== a (+ x 2)) (== b (inc y))] ;2nd possibility
+    [(< (+ x 2) xmax) (>= (dec y)   0) (== a (+ x 2)) (== b (dec y))] ;3rd possibility
+    [(< (inc x) xmax) (>= (- y 2)   0) (== a (inc x)) (== b (- y 2))] ;4th possibility
+    [(>= (dec x)   0) (>= (- y 2)   0) (== a (dec x)) (== b (- y 2))] ;5th possibility
+    [(>= (- x 2)   0) (>= (dec y)   0) (== a (- x 2)) (== b (dec y))] ;6th possibility
+    [(>= (- x 2)   0) (< (inc y) ymax) (== a (- x 2)) (== b (inc y))] ;7th possibility
+    [(>= (dec x)   0) (< (+ y 2) ymax) (== a (dec x)) (== b (+ y 2))] ;8th possibility
   ) 
    (== q [a b]))))) ;return each solution in a vector [x, y]
 
