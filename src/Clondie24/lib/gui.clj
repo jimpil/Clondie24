@@ -77,15 +77,10 @@
      :board-atom
      (reset! (peek (core/undo!)))))    
 
-(defn balance [how]
-(case how
-   :up   (partial * 50)
-   :down (comp int #(/ % 50))))
-
 (defn identify-p 
 "Returns the piece that corresponds to the coordinates on this board." 
 [m b cl-coords]
-(let [balancer (balance :down)
+(let [balancer (ut/balance :down (:tile-size @curr-game))
       [bx by] (map balancer cl-coords)
       l-pos (core/translate-position bx by m)
       f-piece (get b l-pos)]
@@ -96,8 +91,10 @@
             
 (defn make-menubar 
 "Constructs and returns the entire menu-bar." []
-(let [a-new (ssw/action :handler (fn [e] (do (reset-knobs!) (apply (:game-starter @curr-game) '(false)) 
-                                          (ssw/config! status-label :text "Game on! Yellow moves first...")))
+(let [a-new (ssw/action :handler (fn [e]  (reset-knobs!) ((:game-starter @curr-game) false) 
+                                          (ssw/config! status-label :text "Game on! Yellow moves first...")
+                                          (knob! :block? false)
+                                          (ssw/repaint! canvas))
                         :name (str "New " (:name @curr-game)) 
                         :tip  "Start new game." 
                         :key  "menu N")                           
@@ -136,17 +133,18 @@
 
 (defn draw-grid [c ^Graphics g]
   (let [w (ssw/width c)
-        h (ssw/height c)]
-    (doseq [x (range 0 w 50)]
+        h (ssw/height c)
+        ts (:tile-size @curr-game)]
+    (doseq [x (range 0 w ts)]
       (.drawLine g x 0 x h))
-    (doseq [y (range 0 h 50)]
+    (doseq [y (range 0 h ts)]
         (.drawLine g 0 y w y))))
         
 (defn draw-images [^Graphics g]
 (when (seq @core/board-history) 
 (let [b  (peek @core/board-history) ;(:board-atom @curr-game)
       ps (remove nil? b) 
-      balancer (balance :up)]
+      balancer (ut/balance :up (:tile-size @curr-game))]
   (doseq [p ps]
   (let [[bx by] (vec (map balancer (if (vector? (:position p)) (:position p) (ut/Point->Vec (:position p)))));the balanced coords
          pic (:image p)]  ;the actual picture
@@ -158,7 +156,7 @@
                                                  (:highlighting? @knobs))) 
  (let [pmvs (if-let [h (:hint @knobs)] (list (get-in h [:move :end-pos])) ;expecting a hint?
                 (core/getMoves (:selection @knobs) (peek @core/board-history) true)) ;getMoves of selected piece
-       balancer (balance :up)]
+       balancer (ut/balance :up (:tile-size @curr-game))]
    (doseq [m pmvs]
      (let [[rx ry] (vec (map balancer m))]
      (.setColor g (ut/predefined-color 'green))
@@ -169,15 +167,13 @@
 (defn draw-tiles [d ^Graphics g]
   (let [w (ssw/width d)
         h (ssw/height d)
-        tiles (map vector (for [x (range 0 w 50) 
-                                y (range 0 h 50)] [x y]) 
-                          (cycle [(ut/hex->color '0xffdead) ;funny colour name!
-                                  (ut/hsb->color 0.931 0.863 0.545)
-                                  ;(ut/predefined-color 'lightGray) 
-                                  #_(ut/predefined-color 'black)]))]  
-    (doseq [[[x y] c] tiles]
+        tile-size (:tile-size @curr-game)
+        tiles (map vector (for [x (range 0 w tile-size) 
+                                y (range 0 h tile-size)] [x y]) 
+                          (cycle (:alternating-colours @curr-game)))]  
+    #_(doseq [[[x y] c] tiles]
        (.setColor g c)
-       (.fillRect g x y 50 50)) 
+       (.fillRect g x y tile-size tile-size)) 
  (draw-grid d g) 
  (draw-images g)
  (highlight-rects g)))
@@ -195,12 +191,12 @@
                       :hint nil
                       :selection piece)
              (ssw/repaint! canvas))
-  (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
-  (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history) true))
+  (nil? sel) nil ; if selected piece is nil and clicked loc is nil then do nothing
+  (some #{(vec (map (ut/balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history) true))
    (do (core/execute! 
        (core/dest->Move (peek @core/board-history) 
                         (:selection @knobs) 
-                        (vec (map (balance :down) spot))
+                        (vec (map (ut/balance :down) spot))
                         (:mover @curr-game)) (:board-atom @curr-game))
       (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))];check if we have a winner 
       (do (ssw/alert (str "GAME OVER...\n " res))
@@ -282,14 +278,15 @@
                       :selection piece)
              (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
- (and (some #{(vec (map (balance :down) spot))} (map #(:end-pos %) (apply (:team-moves @curr-game)  
-                                                (list (peek @core/board-history) 
-                                                      (get-in @knobs [:selection :direction])))))
-  (some #{(vec (map (balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history) nil)))
+ (and (some #{(vec (map (ut/balance :down) spot))} (map :end-pos 
+                                                ((:team-moves @curr-game)  
+                                                (peek @core/board-history) 
+                                                      (get-in @knobs [:selection :direction]))))
+  (some #{(vec (map (ut/balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history) nil)))
    (do (core/execute! 
        (core/dest->Move (peek @core/board-history) 
                         (:selection @knobs) 
-                        (vec (map (balance :down) spot))
+                        (vec (map (ut/balance :down) spot))
                         (:mover @curr-game)) (:board-atom @curr-game)) 
        (refresh :whose-turn (turn (get-in @knobs [:selection :direction]))
                 :highlighting? false
@@ -298,6 +295,11 @@
        (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))
        (ssw/repaint! canvas)))))
 
+(defn request-canva-repaint []
+(ssw/repaint! canvas))
+
+(definline alert! [s]
+`(ssw/alert ~s))
 
 (defn resize! 
 "Handy macro for resizing the frame outside the gui when we don't have access to swing." 
