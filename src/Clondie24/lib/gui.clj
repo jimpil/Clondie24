@@ -171,9 +171,10 @@
         tiles (map vector (for [x (range 0 w tile-size) 
                                 y (range 0 h tile-size)] [x y]) 
                           (cycle (:alternating-colours @curr-game)))]  
-    #_(doseq [[[x y] c] tiles]
+(when (:alternating-colours @curr-game)
+  (doseq [[[x y] c] tiles]
        (.setColor g c)
-       (.fillRect g x y tile-size tile-size)) 
+       (.fillRect g x y tile-size tile-size)) )
  (draw-grid d g) 
  (draw-images g)
  (highlight-rects g)))
@@ -213,7 +214,8 @@
  (ssw/canvas
     :paint draw-tiles
     :id :canvas
-    :listen [:mouse-clicked (fn [e] (when-not (:block? @knobs) 
+    :listen [:mouse-clicked (fn [e] (when-not (and (:block? @knobs) 
+                                                     (realized? curr-game)) 
                                               (canva-react e)))]
     ;:background "#222222"; no need for background anymore
     ))
@@ -223,7 +225,7 @@
 (defn arena "Constructs and returns the entire arena frame." []
  (ssw/frame
     :title "Clondie24 Arena"
-    :size  [421 :by 506] ;412 :by 462 with border=5
+    :size  (:arena-size @curr-game)
     :resizable? false
     :on-close :exit
     :menubar  (make-menubar)                   

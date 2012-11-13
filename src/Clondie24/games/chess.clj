@@ -70,10 +70,10 @@
 (defn rank->moves 
 "Returns all legal moves of piece p depending on rank of p (excluding pawn). Will be called only once to buffer the moves." 
 [p]
-(let [pos (:position p)            ;[[x y] (:position p) 
+(let [[x y] (:position p)            ;[[x y] (:position p) 
       r (keyword (:rank p))
       d (:direction p)]      
-((r chess-moves) pos))) ;will return a fn which is called with current x and y 
+((r chess-moves) x y))) ;will return a fn which is called with current x and y 
 ;(if (= (class p) (Class/forName "Clondie24.games.chess.ChessPiece2"))
 ;(ut/Point->Vec pos) pos))))  
                                               
@@ -177,6 +177,7 @@
                :images chess-images
                :characteristics [:image :position :rank :value :direction]      
                :board-size 64
+               :arena-size [421 :by 506]
                :tile-size 50
                :alternating-colours [(ut/hex->color '0xffdead) ;funny colour name!
                                      (ut/hsb->color 0.931 0.863 0.545)] 
@@ -219,7 +220,7 @@
 ;(definvokable brain )                                                           
 ;---------------------------------------------------------------------------------------------               
 
-#_(def buffered-moves 
+(def buffered-moves 
 "Precalculate the logical moves of chess-pieces for better performance. Does not apply to pawn."           
 (loop [k 0 m (hash-map)]
 (if (= 64 k) m

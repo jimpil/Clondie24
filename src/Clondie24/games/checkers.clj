@@ -128,6 +128,7 @@
                :images checkers-images
                :characteristics [:image :position :rank :value :direction]  
                :board-size 64
+               :arena-size [421 :by 506]
                :tile-size 50 
                :alternating-colours [(ut/hex->color '0xffdead) ;funny colour name!
                                      (ut/hsb->color 0.931 0.863 0.545)] 

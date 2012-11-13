@@ -99,8 +99,8 @@
                         'O (ut/make-image "images/133px/tic-tac-toe-O.png")}
                :characteristics [:shape :image :position]      
                :board-size 9
+               :arena-size [420 :by 505]
                :tile-size 133
-               :alternating-colours [(ut/predefined-color 'white)] 
                :total-pieces 0
                :mover move
                :team-moves team-moves
@@ -112,9 +112,7 @@
                :game-starter start-tictactoe!
                :hinter tic-tac-toe-best-move 
                :record-name "Clondie24.games.tic-tac-toe.TicTacToePiece" ;;fully qualified name
-               :mappings board-mappings-tic-tac-toe
-               :north-player-start  nil   
-               :south-player-start  nil})
+               :mappings board-mappings-tic-tac-toe})
                 
 (def starting-board (core/empty-board details)) 
 
