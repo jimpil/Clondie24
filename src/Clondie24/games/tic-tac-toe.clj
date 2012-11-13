@@ -67,7 +67,7 @@
 "Returns the winning shape ['O , 'X] or nil. " 
 [b]
 (let [combs (for [[x y z :as rows] winning-sets]
-              (match (vec (map #(:shape (get b %)) rows)) ;[(:shape (get b x)) (:shape (get b y)) (:shape (get b z))]
+              (match (into [] (clojure.core.reducers/map #(:shape (get b %)) rows)) ;[(:shape (get b x)) (:shape (get b y)) (:shape (get b z))]
                 ['X 'X 'X] -1
                 ['O 'O 'O]  1
               :else       0))]  ;;(0 0 0 1  0 0 0 0)             
@@ -165,20 +165,8 @@
  0))
 ;(tournament starting-board 9 (random-player 'X) (random-player 'O))               
                
+(defn -main [& args]
+  (tic-tac-toe-best-move 1 (start-tictactoe! nil) 10 score-ttt-naive))               
                
-               
-               
-               
-               
-               
-               
-               
-               
-               
-               
-               
-               
-               
-               
-               
+                         
                
