@@ -19,7 +19,8 @@
 
 (def board-mappings-tic-tac-toe core/mappings-3x3)
 (def winning-sets [[0 1 2] [3 4 5] [6 7 8] [0 3 6] [1 4 7] [2 5 8] [0 4 8] [2 4 6]])
-(def dir->shape {-1 'X 1 'O}) ;;we use direction to represent shape {-1 'X 1 'O}
+(def dir->shape {'X -1 'O 1}) ;;we use direction to represent shape {-1 'X 1 'O}
+(defn shape->dir [s] (get s dir->shape))
 (def turns (->> (cycle ['X 'O]) 
                 (take 20)
                 atom))
@@ -82,7 +83,13 @@
 "Start a tic-tac-toe game. Returns the starting-board."
 (core/clear-history!) ;empty board-history
  (deliver s/curr-game details)
-  (reset! current-tictactoeItems starting-board))  
+  (reset! current-tictactoeItems starting-board)) 
+  
+ (defn team-moves [b s _ _] 
+ (clojure.core.reducers/map 
+     #(core/dest->Move b nil % move) 
+ (-> (TicTacToePiece. s nil nil) 
+     (core/getMoves b nil))))  
                 
 (def details "The map that describes the game of tic-tac-toe."
               {:name 'Tic-Tac-Toe
@@ -96,10 +103,11 @@
                :alternating-colours [(ut/predefined-color 'white)] 
                :total-pieces 0
                :mover move
+               :team-moves team-moves
                ;:referee-gui gui-referee
                :referee-jit winner
                ;:naive-scorer core/score-chess-naive
-               :pref-depth 9
+               :pref-depth 10
                :board-atom current-tictactoeItems
                :game-starter start-tictactoe!
                :hinter tic-tac-toe-best-move 
@@ -151,7 +159,10 @@
 (defn random-player [shape]
 (Player. nil shape ttt-rand-move))            
                
-
+(defn score-ttt-naive [s b]
+ (if-let [w (winner b)] 
+    (if (= w s) 1 -1)
+ 0))
 ;(tournament starting-board 9 (random-player 'X) (random-player 'O))               
                
                
