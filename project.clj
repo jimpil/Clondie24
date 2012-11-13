@@ -6,7 +6,7 @@
   :dependencies [[org.clojure/clojure "1.5.0-alpha4"]
                  ;[org.clojure/clojure "1.5.0-alpha3"]
                  [org.clojure/core.logic "0.8-alpha3" ] ; 
-                 [midje "1.5-alpha2"]
+                 ;[midje "1.5-alpha2"]
                  [org.clojure/core.match "0.2.0-alpha11"]
                  [ghostandthemachine/seesaw "1.4.3-SNAPSHOT" :exclusions [org.clojure/clojure]] 
                  ;[seesaw "1.4.2" :exclusions [org.clojure/clojure]]
