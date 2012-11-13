@@ -1,6 +1,6 @@
 (ns Clondie24.core-test
   (:use midje.sweet
-        Clondie24.core))
+        Clondie24.lib.core))
 
     
 (def dummy-mappings [[0 0] [0 1] [1 0] [1 1]]) 

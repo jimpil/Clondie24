@@ -12,11 +12,11 @@
                  ;[seesaw "1.4.2" :exclusions [org.clojure/clojure]]
                  [enclog "0.5.8-SNAPSHOT"] 
                  ]
-  :dev-dependencies [[midje "1.4.0"]]               
+  :dev-dependencies [[[midje "1.5-alpha2"]]]               
   ;:plugins [[lein-swank "1.4.4"]]             
   :jvm-opts ["-Xmx2g" "-server" "-XX:+UseCompressedOops"] 
   :warn-on-reflection true
  ;:javac-options {:classpath "target/dependency/encog-core-3.1.0.jar" :destdir "target/classes"}
  ;:java-source-path "src/java"
- :main     Clondie24.games.tic-tac-toe             
+ ;:main     Clondie24.games.tictactoe             
  )

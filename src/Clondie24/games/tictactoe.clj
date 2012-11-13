@@ -1,4 +1,4 @@
-(ns Clondie24.games.tic-tac-toe
+(ns Clondie24.games.tictactoe
     (:use [clojure.core.match :only (match)]) 
     (:require [Clondie24.lib.util :as ut] 
               [Clondie24.lib.core :as core]
