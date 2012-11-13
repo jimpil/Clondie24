@@ -332,7 +332,7 @@ otherwise returns the last board. Intended to be used with genetic training."
 "Starts a graphical (swing) Chess game." 
 [& args]
 #_(ga brain 10)
-(fast-tournament (start-chess! false) 4 
+#_(fast-tournament (start-chess! false) 4 
   (neural-player brain -1)
   ;(random-player -1) 
   (naive-player 1) :limit 20)
@@ -340,9 +340,7 @@ otherwise returns the last board. Intended to be used with genetic training."
       no (neural-output ni)]  
 (normalize-fields ni no))
 ;(anormalise (neural-input (start-chess! false) -1 false)) ;;quick and easy way is preferred
-;(gui/show-gui! details)
-#_(time (s/go -1 (start-chess! false) 4) #_(println @s/mmm))
-#_(time (do (s/go -1 (start-chess! false) 4) (println @s/mmm))) 
+(gui/show-gui! details)
 )
 
 
