@@ -31,7 +31,7 @@
 (defn log-board 
 "The logging function for the board ref. Will conj every new board-state into a vector." 
 [dest k r old n] 
- (when (not= n (peek @dest))  
+ (when-not (= n (peek @dest))  
   (swap! dest conj n)))
 
 (defprotocol Piece "The Piece abstraction."
@@ -97,13 +97,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (definline populate-board 
 "Builds a new board with nils where dead pieces." 
 [board]     
-`(into [] (r/map #(if (alive? %) % nil) ~board)))
-
-(definline put 
-"Simple move fn that doesn't 'move' pieces but 'puts' them instead (e.g tic-tac-toe).
- Returns the new board without making any state changes." 
-[board p]  
-`(assoc ~board (getListPosition ~p) ~p))              
+`(into [] (r/map #(if (alive? %) % nil) ~board)))         
 
 (defn move 
 "The function responsible for moving Pieces. Each piece knows where it can move. 
@@ -154,10 +148,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn undo! []
 (try (swap! board-history pop)
 (catch Exception e @board-history))) ;popping an empty stack throws an error (just return the empty one)    
-      
-;(for [letter "ABCDEFGH" ;strings are seqable
-;     number (range 1 9)]
-;(format "%c%d" letter number)))
+     
 
 (defn clear-history! []
  (swap! board-history empty)) 
