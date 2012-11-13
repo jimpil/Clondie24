@@ -164,7 +164,8 @@
 ;(tournament starting-board 9 (random-player 'X) (random-player 'O))               
                
 (defn -main [& args]
-  (tic-tac-toe-best-move 1 (start-tictactoe! nil) 10 score-ttt-naive))               
+(gui/show-gui! details)
+#_(tic-tac-toe-best-move 1 (start-tictactoe! nil) 10 score-ttt-naive))               
                
                          
                
