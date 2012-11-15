@@ -227,7 +227,7 @@
     :title "Clondie24 Arena"
     :size  (:arena-size @curr-game)
     :resizable? false
-    :on-close :exit
+    :on-close :dispose
     :menubar  (make-menubar)                   
     :content  (ssw/border-panel
                :border 10
