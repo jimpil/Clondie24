@@ -18,6 +18,10 @@
 (def previous-move (atom nil))  ;will need this for en-passant
 (def state-dependent-moves (atom {:castling nil 
                                   :en-passant nil})) 
+
+(def chess-board-colours [(ut/hex->color '0xffdead) ;funny colour name!
+                          (ut/hsb->color 0.931 0.863 0.545)])
+
 (defrecord Player [brain ^int direction searcher])
                                  
 
@@ -179,8 +183,10 @@
                :board-size 64
                :arena-size [421 :by 506]
                :tile-size 50
-               :alternating-colours [(ut/hex->color '0xffdead) ;funny colour name!
-                                     (ut/hsb->color 0.931 0.863 0.545)] 
+               :alternating-colours chess-board-colours
+               :tiles (map vector (for [x (range 0 420 50) 
+                                         y (range 0 506 50)] [x y]) 
+                                  (cycle chess-board-colours))
                :total-pieces 32
                :rel-values rel-values
                :obligatory-move nil

@@ -165,14 +165,9 @@
      (.fillRect g rx ry 50 50))))))           
         
 (defn draw-tiles [d ^Graphics g]
-  (let [w (ssw/width d)
-        h (ssw/height d)
-        tile-size (:tile-size @curr-game)
-        tiles (map vector (for [x (range 0 w tile-size) 
-                                y (range 0 h tile-size)] [x y]) 
-                          (cycle (:alternating-colours @curr-game)))]  
+  (let [tile-size (:tile-size @curr-game)]  
 (when (:alternating-colours @curr-game)
-  (doseq [[[x y] c] tiles]
+  (doseq [[[x y] c] (:tiles @curr-game)]
        (.setColor g c)
        (.fillRect g x y tile-size tile-size)) )
  (draw-grid d g) 

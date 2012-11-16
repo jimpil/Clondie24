@@ -100,6 +100,9 @@
                :characteristics [:shape :image :position]      
                :board-size 9
                :arena-size [420 :by 505]
+               :tiles (map vector (for [x (range 0 420 133) 
+                                        y (range 0 505 133)] [x y]) 
+                                  (cycle nil))
                :tile-size 133
                :total-pieces 0
                :mover move
