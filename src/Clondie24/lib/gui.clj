@@ -32,8 +32,8 @@
 (def curr-game (promise))
 
 (defn refresh [& {:as knobs}]
-(doseq [e knobs]
- (knob! (first e) (second e))))
+  (doseq [[k v] knobs]
+    (knob! k v)))
  
 (defmacro reset-knobs! []
 `(reset! knobs brand-new)) 
