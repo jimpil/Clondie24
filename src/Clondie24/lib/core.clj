@@ -31,7 +31,7 @@
 (defn log-board 
 "The logging function for the board ref. Will conj every new board-state into a vector." 
 [dest k r old n] 
- (when-not (= n (peek @dest))  
+ (when-not (= n (peek old))  
   (swap! dest conj n)))
 
 (defprotocol Piece "The Piece abstraction."
@@ -128,7 +128,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defrecord Move [p mover ^clojure.lang.PersistentVector end-pos]
  Movable
- (try-move [this] (mover p end-pos))
+ (try-move [this]  (-> (mover p end-pos)
+                     (with-meta {:caused-by this}))) ;;last-move
  (getOrigin [this] (:position p))
  Object
  (toString [this] 

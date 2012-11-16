@@ -15,7 +15,6 @@
 ;----------------------------------------<CODE>----------------------------------------------------------------------
 
 (def board-mappings-chess core/mappings-8x8)
-(def previous-move (atom nil))  ;will need this for en-passant
 (def state-dependent-moves (atom {:castling nil 
                                   :en-passant nil})) 
 
@@ -61,9 +60,10 @@
 
 (def current-chessItems
 "This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
-(add-watch (atom nil) 
- :log (partial core/log-board core/board-history))) 
- 
+ (-> (atom nil)
+   (add-watch  :log (partial core/log-board core/board-history))
+   #_(add-watch  :last-move (fn [k r old n] (swap! r conj n)))))
+
 (def chess-moves {:pawn     (partial rul/pawn-moves board-mappings-chess) 
                   :rook      rul/rook-moves
                   :bishop    rul/bishop-moves
@@ -184,7 +184,7 @@
                :arena-size [421 :by 506]
                :tile-size 50
                :alternating-colours chess-board-colours
-               :tiles (map vector (for [x (range 0 420 50) 
+               :tiles (map vector (for [x (range 0 421 50) 
                                          y (range 0 506 50)] [x y]) 
                                   (cycle chess-board-colours))
                :total-pieces 32

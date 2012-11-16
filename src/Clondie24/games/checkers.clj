@@ -18,6 +18,9 @@
                       -1 (ut/make-image "images/50px/png/checker-white.png")}
                       {1 (ut/make-image "images/50px/png/prince-black.png")
                       -1 (ut/make-image "images/50px/png/prince-white.png")}]))
+
+(def checkers-board-colours [(ut/hex->color '0xffdead) ;funny colour name!
+                             (ut/hsb->color 0.931 0.863 0.545)])
                        
 (def checkers-moves {:soldier  (partial rul/checker-moves board-mappings-checkers) 
                      :prince   (partial rul/prince-moves board-mappings-checkers)})
@@ -130,8 +133,10 @@
                :board-size 64
                :arena-size [421 :by 506]
                :tile-size 50 
-               :alternating-colours [(ut/hex->color '0xffdead) ;funny colour name!
-                                     (ut/hsb->color 0.931 0.863 0.545)] 
+               :alternating-colours checkers-board-colours
+               :tiles (map vector (for [x (range 0 421 50) 
+                                         y (range 0 506 50)] [x y]) 
+                                  (cycle checkers-board-colours))
                :total-pieces 48 ;24 ;;temporary hack
                :obligatory-move 'jump
                :rel-values {:soldier 1 :prince 3}
