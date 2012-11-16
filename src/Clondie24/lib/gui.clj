@@ -309,7 +309,8 @@
 (ssw/config! f :size [w :by h]))
      
                                                        
-(defn show-gui! "Everything starts from here." [game-map] 
+(defn show-gui! "Everything starts from here." [game-map]
+ (reset-knobs!)      ;start from scratch 
  (set-laf! "Nimbus") ;try to look nice
   (deliver curr-game game-map) ;firstly make the gui aware of what game we want it to display
    (ssw/invoke-later 
