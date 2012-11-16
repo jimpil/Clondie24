@@ -146,7 +146,7 @@
       ps (remove nil? b) 
       balancer (ut/balance :up (:tile-size @curr-game))]
   (doseq [p ps]
-  (let [[bx by] (vec (map balancer (if (vector? (:position p)) (:position p) (ut/Point->Vec (:position p)))));the balanced coords
+  (let [[bx by] (mapv balancer (if (vector? (:position p)) (:position p) (ut/Point->Vec (:position p))));the balanced coords
          pic (:image p)]  ;the actual picture
     (.drawImage g pic bx by nil)))))) ;finally call g.drawImage() 
      
@@ -158,7 +158,7 @@
                 (core/getMoves (:selection @knobs) (peek @core/board-history) true)) ;getMoves of selected piece
        balancer (ut/balance :up (:tile-size @curr-game))]
    (doseq [m pmvs]
-     (let [[rx ry] (vec (map balancer m))]
+     (let [[rx ry] (mapv balancer m)]
      (.setColor g (ut/predefined-color 'green))
      (.setComposite ^Graphics2D g (AlphaComposite/getInstance 
                                    AlphaComposite/SRC_OVER (float 0.5)))
@@ -178,7 +178,8 @@
 (defmethod canva-react 'Chess [^MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e)) ;;(seesaw.mouse/location e)
       piece (identify-p (:mappings @curr-game) (peek @core/board-history) spot)
-      sel   (:selection @knobs)]
+      sel   (:selection @knobs)
+      le-loc (mapv (ut/balance :down) spot)]
 (cond 
   (or
     (and (nil? sel) (not (nil? piece)))           
@@ -188,11 +189,11 @@
                       :selection piece)
              (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and clicked loc is nil then do nothing
-  (some #{(vec (map (ut/balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history) true))
+  (some #{le-loc} (core/getMoves (:selection @knobs) (peek @core/board-history) true))
    (do (core/execute! 
        (core/dest->Move (peek @core/board-history) 
                         (:selection @knobs) 
-                        (vec (map (ut/balance :down) spot))
+                        le-loc
                         (:mover @curr-game)) (:board-atom @curr-game))
       (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))];check if we have a winner 
       (do (ssw/alert (str "GAME OVER...\n " res))

@@ -31,7 +31,7 @@
 (defn log-board 
 "The logging function for the board ref. Will conj every new board-state into a vector." 
 [dest k r old n] 
- (when-not (= n (peek old))  
+ (when-not (= n old)  
   (swap! dest conj n)))
 
 (defprotocol Piece "The Piece abstraction."
@@ -55,11 +55,13 @@
 Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'." 
 ([^long i mappings] ;{:post [(not (nil? %))]}   
   (let [grid-loc (get mappings i)] ;will translate from 1d to 2d
-    (if-not (nil? grid-loc) grid-loc ;not found 
+    (if-not (nil? grid-loc)  ;not found 
+      grid-loc 
     (throw (IllegalStateException. (str "NOT a valid list-location:" i))))))
-([x y ^clojure.lang.PersistentVector mappings] ;{:post [(not (== % -1))]} 
+([x y ^clojure.lang.PersistentVector mappings] ;{:post [(not= % -1)]} 
   (let [list-loc (.indexOf mappings [x y])] ;will translate from 2d to 1d
-    (if-not (= list-loc -1) list-loc ;not found
+    (if-not (= list-loc -1) ;not found 
+      list-loc 
      (throw (IllegalStateException. (str "NOT a valid grid-location: [" x ", " y "]")))))))
 
 (def translate-position (memoize translate))
@@ -128,16 +130,18 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defrecord Move [p mover ^clojure.lang.PersistentVector end-pos]
  Movable
- (try-move [this]  (-> (mover p end-pos)
-                     (with-meta {:caused-by this}))) ;;last-move
+ (try-move [this]  (println "adding meta!")
+   (with-meta (mover p end-pos) {:caused-by this})) ;;last-move
  (getOrigin [this] (:position p))
  Object
  (toString [this] 
-   (println "Move from:" (getOrigin this) "to:" end-pos)))   
+   (println "#'Move{:from" (:position p) ":to" end-pos)))   
 
-(definline dest->Move "Constructor for creating moves. It wouldn't make sense to pass more than 1 mover-fns." 
-[b p dest mover]  `(if (nil? ~mover) (Move. ~p #(move ~b %1 %2) ~dest)
-                                     (Move. ~p #(~mover ~b %1 %2) ~dest)))
+(defn dest->Move 
+ "Constructor for creating moves from destinations. 
+ It wouldn't make sense to pass more than 1 mover-fns." 
+[b p dest mover]  (if (nil? mover) (Move. p #(move b %1 %2) dest)
+                                   (Move. p #(mover b %1 %2) dest)))
 
 (defn execute! [^Move m batom]
  (reset! batom (try-move m)))
