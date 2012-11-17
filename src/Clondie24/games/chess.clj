@@ -206,23 +206,35 @@
                :north-player-start  (starting-chessItems true)   ;opponent (black)
                :south-player-start  (starting-chessItems false)});human (white or yellow)
 
-(defn castling-move [b king]
+(defn castling-mover [board pawns new-positions]
+ (reduce (fn [b [piece coo]]
+            (let [newPiece (core/update-position piece coo) ;the new piece as a result of moving 
+                  old-pos  (core/getListPosition piece)
+                  new-pos  (core/getListPosition newPiece)]            
+                   (assoc b old-pos nil 
+                            new-pos newPiece))) board (seq (zipmap pawns new-positions))))
+
+(defn castling-moves [b king]
  (let [[kx ky] (:position king)
         krook (get b (core/translate-position (+ 3 kx) ky core/mappings-8x8))
-        qrook (get b (core/translate-position (- 4 kx) ky core/mappings-8x8))]
+        qrook (get b (core/translate-position (- 4 kx) ky core/mappings-8x8))
+        castlings (make-array java.util.Map 2)] ;;the two sides (left or right)
   (cond 
     (:has-moved? (meta king)) nil
     (and (nil? (get b (core/translate-position (inc kx) ky core/mappings-8x8)))
          (nil? (get b (core/translate-position (+ 2 kx) ky core/mappings-8x8)))
          (not (:has-moved?  krook)))
- {:k-move (core/dest->Move b king  [(+ 2 kx) ky] nil)
-  :r-move (core/dest->Move b krook [(+ 1 kx) ky] nil)} ;;kingside castling-move (2 moves)
+ (aset castlings 0 (core/dest->Move b [king, krook]  [[(+ 2 kx) ky], [(+ 1 kx) ky]] castling-mover)) ;;kingside castling-move (2 moves)
    (and (nil? (get b (core/translate-position (dec kx) ky core/mappings-8x8)))
-        (nil? (get b (core/translate-position (- 2 kx) ky core/mappings-8x8)))
-        (nil? (get b (core/translate-position (- 3 kx) ky core/mappings-8x8)))
-        (not (:has-moved?  qrook))) 
- {:k-move (core/dest->Move b king  [(- 2 kx) ky] nil)
-  :r-move (core/dest->Move b krook [(- 1 kx) ky] nil)}))) ;;queenside castling-move
+        (nil? (get b (core/translate-position (- kx 2) ky core/mappings-8x8)))
+        (nil? (get b (core/translate-position (- kx 3) ky core/mappings-8x8)))
+        (not (:has-moved?  qrook)))
+ (aset castlings 1 ;;a move with double-impact (the mover must be able to hanle it)
+       (core/dest->Move b [king, qrook]  [[(- kx 2) ky], [(- kx 1) ky]] castling-mover))) ;;queenside castling-move
+  (remove nil? castlings)))
+;(let [cas-moves (castling-moves ~b ~king)]
+;;(if-not cas-moves nil 
+;;  (conj team-moves cas-moves)))
                
                       
 (defmacro definvokable

@@ -116,8 +116,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
             new-pos newPiece) 
      ;(assoc! )
      ;(persistent!)
-     #_(populate-board))) ;replace dead-pieces with nils
-#_(throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!"))))
+     #_(populate-board)))) ;replace dead-pieces with nils
+#_(throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!")))
 
 (defn amove 
 "Same as 'move' but fast (expects a mutable array for board). Returns the mutated board." 
@@ -139,8 +139,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn dest->Move 
  "Constructor for creating moves from destinations. 
  It wouldn't make sense to pass more than 1 mover-fns." 
-[b p dest mover]  (if (nil? mover) (Move. p #(move b %1 %2) dest)
-                                   (Move. p #(mover b %1 %2) dest)))
+[b p dest mover]  (if (nil? mover) (Move. p (partial move b) dest)
+                                   (Move. p (partial mover b) dest)))
 
 (defn execute! [^Move m batom]
  (reset! batom (try-move m)))
