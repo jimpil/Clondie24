@@ -15,7 +15,7 @@
 ;----------------------------------------<CODE>----------------------------------------------------------------------
 
 (def board-mappings-chess core/mappings-8x8)
-(def state-dependent-moves (atom {:castling nil 
+#_(def state-dependent-moves (atom {:castling nil 
                                   :en-passant nil})) 
 
 (def chess-board-colours [(ut/hex->color '0xffdead) ;funny colour name!
@@ -117,7 +117,8 @@
  core/Piece 
  (update-position [this np] (if (and (= (second np) (get promotion-row direction))
                                      (= rank 'pawn)) (core/promote this np) 
-                                (ChessPiece. image np rank value direction {:alive true} nil)))
+                                (ChessPiece. image np rank value direction {:alive true 
+                                                                            :has-moved? true} nil)))
  (die [this]     (vary-meta this assoc :alive false)) ;communicate death through meta-data 
  (promote [this np] (ChessPiece. (get-in chess-images [:queen direction]) np 'queen 9 direction)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first  position) (second position) board-mappings-chess))
@@ -163,10 +164,10 @@
 (if black?  
 (map #(ChessPiece. (get-in chess-images [(keyword %2) 1])
       (core/translate-position % board-mappings-chess) %2
-                       ((keyword %2) rel-values)  1 {:alive true} nil) (range 16) chessPos->rank)
+                       ((keyword %2) rel-values)  1 {:alive true :has-moved? false} nil) (range 16) chessPos->rank)
 (map #(ChessPiece. (get-in chess-images [(keyword %2) -1]) 
       (core/translate-position % board-mappings-chess) %2
-                      ((keyword %2) rel-values)  -1 {:alive true} nil) (range 48 64) (reverse chessPos->rank))))
+                      ((keyword %2) rel-values)  -1 {:alive true :has-moved? false} nil) (range 48 64) (reverse chessPos->rank))))
                       
 (def brain (ai/network (ai/neural-pattern :feed-forward) 
                         :activation :sigmoid
@@ -203,6 +204,24 @@
                :mappings board-mappings-chess
                :north-player-start  (starting-chessItems true)   ;opponent (black)
                :south-player-start  (starting-chessItems false)});human (white or yellow)
+
+(defn castling-move [b king]
+ (let [[kx ky] (:position king)
+        krook (get b (core/translate-position (+ 3 kx) ky core/mappings-8x8))
+        qrook (get b (core/translate-position (- 4 kx) ky core/mappings-8x8))]
+  (cond 
+    (:has-moved? (meta king)) nil
+    (and (nil? (get b (core/translate-position (inc kx) ky core/mappings-8x8)))
+         (nil? (get b (core/translate-position (+ 2 kx) ky core/mappings-8x8)))
+         (not (:has-moved?  krook)))
+ {:k-move (core/dest->Move b king  [(+ 2 kx) ky] nil)
+  :r-move (core/dest->Move b krook [(- 2 kx) ky] nil)} ;;kingside castling-move (2 moves)
+   (and (nil? (get b (core/translate-position (dec kx) ky core/mappings-8x8)))
+        (nil? (get b (core/translate-position (- 2 kx) ky core/mappings-8x8)))
+        (nil? (get b (core/translate-position (- 3 kx) ky core/mappings-8x8)))
+        (not (:has-moved?  qrook))) 
+ {:k-move (core/dest->Move b king  [(- 2 kx) ky] nil)
+  :r-move (core/dest->Move b krook [(+ 3 kx) ky] nil)}))) ;;queenside castling-move
                
                       
 (defmacro definvokable
