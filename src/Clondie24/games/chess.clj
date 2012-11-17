@@ -41,11 +41,12 @@
   [{1 (ut/make-image "images/50px/png/Black Q.png")
    -1 (ut/make-image "images/50px/png/Yellow Q.png")}]                     
                        
-(def promotion-row {1 7 -1 0})                       
+(def promotion-row {1 7 -1 0})
+(def pos-groups [['rook 'knight 'bishop 'queen 'king 'bishop 'knight 'rook] (repeat 8 'pawn)])
 
 (def chessPos->rank 
-(flatten ['rook 'knight 'bishop 'queen 'king 'bishop 'knight 'rook (repeat 8 'pawn)]))
-
+(flatten pos-groups))
+         
 (def rel-values (zipmap '(:queen :rook :knight :bishop :pawn :king) 
                         '(  9      5     3       3       1    100)))
 
@@ -167,7 +168,7 @@
                        ((keyword %2) rel-values)  1 {:alive true :has-moved? false} nil) (range 16) chessPos->rank)
 (map #(ChessPiece. (get-in chess-images [(keyword %2) -1]) 
       (core/translate-position % board-mappings-chess) %2
-                      ((keyword %2) rel-values)  -1 {:alive true :has-moved? false} nil) (range 48 64) (reverse chessPos->rank))))
+                      ((keyword %2) rel-values)  -1 {:alive true :has-moved? false} nil) (range 48 64) (flatten (reverse pos-groups)))))
                       
 (def brain (ai/network (ai/neural-pattern :feed-forward) 
                         :activation :sigmoid
@@ -215,13 +216,13 @@
          (nil? (get b (core/translate-position (+ 2 kx) ky core/mappings-8x8)))
          (not (:has-moved?  krook)))
  {:k-move (core/dest->Move b king  [(+ 2 kx) ky] nil)
-  :r-move (core/dest->Move b krook [(- 2 kx) ky] nil)} ;;kingside castling-move (2 moves)
+  :r-move (core/dest->Move b krook [(+ 1 kx) ky] nil)} ;;kingside castling-move (2 moves)
    (and (nil? (get b (core/translate-position (dec kx) ky core/mappings-8x8)))
         (nil? (get b (core/translate-position (- 2 kx) ky core/mappings-8x8)))
         (nil? (get b (core/translate-position (- 3 kx) ky core/mappings-8x8)))
         (not (:has-moved?  qrook))) 
  {:k-move (core/dest->Move b king  [(- 2 kx) ky] nil)
-  :r-move (core/dest->Move b krook [(+ 3 kx) ky] nil)}))) ;;queenside castling-move
+  :r-move (core/dest->Move b krook [(- 1 kx) ky] nil)}))) ;;queenside castling-move
                
                       
 (defmacro definvokable
