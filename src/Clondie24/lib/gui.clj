@@ -184,10 +184,10 @@
   (or
     (and (nil? sel) (not (nil? piece)))           
     (and (not (nil? sel)) (= (:direction piece) (:direction sel)))) 
-         (do (refresh :highlighting? false 
+         (refresh :highlighting? false 
                       :hint nil
                       :selection piece)
-             (ssw/repaint! canvas))
+          (ssw/repaint! canvas)
   (nil? sel) nil ; if selected piece is nil and clicked loc is nil then do nothing
   (some #{le-loc} (core/getMoves (:selection @knobs) (peek @core/board-history) true))
    (do (core/execute! 

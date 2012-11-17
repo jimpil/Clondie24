@@ -130,12 +130,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defrecord Move [p mover ^clojure.lang.PersistentVector end-pos]
  Movable
- (try-move [this]  (println "adding meta!")
-   (with-meta (mover p end-pos) {:caused-by this})) ;;last-move
+ (try-move [this]  (with-meta (mover p end-pos) {:caused-by this})) ;;the board returned was caused by this move
  (getOrigin [this] (:position p))
  Object
  (toString [this] 
-   (println "#'Move{:from" (:position p) ":to" end-pos)))   
+   (println "#Move {:from" (:position p) ":to" end-pos)))   
 
 (defn dest->Move 
  "Constructor for creating moves from destinations. 
@@ -180,8 +179,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  (nil? 
   (get b (translate-position x y m))))) 
   
-(def occupied?
-(complement vacant?))   
+(def occupied? (complement vacant?))   
  
 (definline bury-dead [c]
  `(filter alive? ~c))  
@@ -190,14 +188,13 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 "Returns true if the move collides with any friendly pieces. 
  The move will be walked step by step by the walker fn."
 [move walker b m] ;last 2 can be false, nil
-`(let [ep#  (:end-pos ~move)
+`(let [[epx# epy# :as ep#]  (:end-pos ~move)
        dir# (get-in ~move [:p :direction])]                                         
-(loop [imm-p# (if (nil? ~walker) ep# (~walker (getOrigin ~move)))] ;if walker is nil make one big step to the end       
+(loop [[imm-px# imm-py# :as imm-p#] (if (nil? ~walker) ep# (~walker (getOrigin ~move)))] ;if walker is nil make one big step to the end       
 (cond  
   (=  imm-p# ep#) ;if reached destination there is potential for attack
-       (if (not= dir# (:direction (get ~b (translate-position (first  ep#) 
-                                                              (second ep#) ~m)))) false true)    
-  (not (nil? (get ~b (translate-position (first imm-p#) (second imm-p#) ~m)))) true
+       (if (not= dir# (:direction (get ~b (translate-position epx# epy# ~m)))) false true)    
+  (not (nil? (get ~b (translate-position imm-px# imm-py# ~m)))) true
 :else (recur (~walker imm-p#))))))
 
 (defn acollides? "Same as 'collides?' but deals with an array as b - not a vector."
@@ -216,7 +213,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
        def-prec#  (some #(when (and (= ~precious (:rank %)) 
                                     (= dir# (:direction %))) %) next-b#)]
 (some #(threatens? def-prec# % next-b#) 
-  (into [] (gather-team next-b# (unchecked-negate dir#)))))))
+  (into [] (gather-team next-b# (- dir#)))))))
 
 
 (defn score-chess-naive ^double [b dir]
