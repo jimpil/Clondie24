@@ -124,8 +124,7 @@
  (promote [this np] (ChessPiece. (get-in chess-images [:queen direction]) np 'queen 9 direction)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first  position) (second position) board-mappings-chess))
  (getPoint [this] (ut/make-point position))
- (getMoves "Returns a list of core/Move objects." 
-   [this b with-precious?]
+ (getMoves [this b with-precious?]
   (let [[x y] position]
     (core/remove-illegal #(or 
                              (core/collides? (core/dest->Move b this % nil) 
