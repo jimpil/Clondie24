@@ -130,8 +130,8 @@
     (core/remove-illegal #(or 
                              (core/collides? (core/dest->Move b this % nil) 
                                  (ut/make-walker 
-                                 (ut/resolve-direction position %) rank) b board-mappings-chess)
-                            (core/exposes? (core/dest->Move b this % (:mover details)) (when with-precious? 'king)))    
+                                 (ut/resolve-direction position (:end-pos %)) rank) b board-mappings-chess)
+                            (core/exposes? % (when with-precious? 'king)))    
                   (condp = rank 
                     'pawn (->> (((keyword rank) chess-moves)  b x y direction)
                             (map #(core/dest->Move b this % nil)))
