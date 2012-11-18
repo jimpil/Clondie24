@@ -127,7 +127,7 @@
  (getMoves [this b with-precious?]
   (let [[x y] position]
     (core/remove-illegal #(or 
-                             (core/collides? (core/dest->Move b this % nil) 
+                             (core/collides? % 
                                  (ut/make-walker 
                                  (ut/resolve-direction position (:end-pos %)) rank) b board-mappings-chess)
                             (core/exposes? % (when with-precious? 'king)))    
