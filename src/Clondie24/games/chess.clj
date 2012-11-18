@@ -125,26 +125,27 @@
  (getListPosition [this] (core/translate-position (first  position) (second position) board-mappings-chess))
  (getPoint [this] (ut/make-point position))
  (getMoves [this b with-precious?]
-  (let [[x y] position]
+  (let [[x y] position
+        move-creator #(core/dest->Move b this % nil)]
     (core/remove-illegal #(or 
                              (core/collides? % 
-                                 (ut/make-walker 
+                               (ut/make-walker 
                                  (ut/resolve-direction position (:end-pos %)) rank) b board-mappings-chess)
                             (core/exposes? % (when with-precious? 'king)))    
                   (condp = rank 
-                    'pawn (->> (((keyword rank) chess-moves)  b x y direction)
-                            (map #(core/dest->Move b this % nil)))
+                    'pawn (->> ((:pawn chess-moves)  b x y direction)
+                            (map move-creator))
                     'king (->
-                            (->> (get-in buffered-moves [(core/translate-position x y board-mappings-chess) 
-                                                         (keyword rank)])
-                             (map #(core/dest->Move b this % nil)))
+                            (->> (get-in buffered-moves 
+                                    [(core/translate-position x y board-mappings-chess) :king])
+                             (map move-creator))
                            (conj (castling-moves b this))) ;;casting is a move of the king's
-                     (->> (get-in buffered-moves [(core/translate-position x y board-mappings-chess) 
-                                                  (keyword rank)])
-                       (map #(core/dest->Move b this % nil))))))) ;returns a list of Move objects 
+                     (->> (get-in buffered-moves
+                              [(core/translate-position x y board-mappings-chess) (keyword rank)])
+                       (map move-creator)))))) ;returns a list of Move objects 
  Object
  (toString [this] 
-   (println "ChessItem (" rank ") at position:" (core/getListPosition this) " ->" position)) )
+   (println "Chess-item (" rank ") at position:" (core/getListPosition this) " ->" position)) )
    
 #_(defrecord ChessPiece2 [^java.awt.Image image 
                         ^java.awt.Point position 
