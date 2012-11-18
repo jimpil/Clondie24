@@ -132,7 +132,7 @@
                                  (ut/make-walker 
                                  (ut/resolve-direction position %) rank) b board-mappings-chess)
                             (core/exposes? (core/dest->Move b this % (:mover details)) (when with-precious? 'king)))    
-                  (condp #(= rank %) 
+                  (condp = rank 
                     'pawn (->> (((keyword rank) chess-moves)  b x y direction)
                             (map #(core/dest->Move b this % nil)))
                     'king (->
