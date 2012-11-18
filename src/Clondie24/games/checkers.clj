@@ -62,7 +62,7 @@
      
      
 (definline team-moves "Jumps have priority." [b dir & more]
-`(let [all# (into [] (core/team-moves ~b ~dir move nil)) ;;our specific move-fn
+`(let [all# (into [] (core/team-moves ~b ~dir nil)) ;;our specific move-fn
       jumps# (filter #(jump? (get-in % [:p :position]) (:end-pos %))  all#)]
  (if (seq jumps#) jumps# all#)))      
 
@@ -80,8 +80,9 @@
  (getPoint [this] (ut/make-point position))
  (getMoves [this b _] 
                   (let [[x y] position]
+                   (map #(core/dest->Move b this % move)   ;;our specific mover
                   ;(map #(with-meta % {:jump? (jump? position %)}) 
-                   (((keyword rank) checkers-moves) b x y direction)))
+                   (((keyword rank) checkers-moves) b x y direction))))
  Object
  (toString [this] 
    (println "Checker (" rank ") at position:" (core/getListPosition this) " ->" position)) )

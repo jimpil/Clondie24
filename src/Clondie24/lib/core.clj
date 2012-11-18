@@ -163,12 +163,12 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
  
 (definline team-moves "Filters all the moves for the team with direction 'dir' on this board b. Returns a reducer." 
-[b dir mover exposes-check?]
+[b dir exposes-check?]
 `(let [team# (gather-team ~b ~dir) 
        tmvs# (r/mapcat 
                   (fn [p#] 
-                    (r/map #(dest->Move ~b p# % ~mover) 
-                            (getMoves p# ~b ~exposes-check?))) team#)]
+                    ;(r/map #(dest->Move ~b p# % ~mover) 
+                            (getMoves p# ~b ~exposes-check?)) team#)]
  tmvs# ))
 
 

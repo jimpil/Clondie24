@@ -10,7 +10,7 @@
                  [org.clojure/core.match "0.2.0-alpha11"]
                  [ghostandthemachine/seesaw "1.4.3-SNAPSHOT" :exclusions [org.clojure/clojure]] 
                  ;[seesaw "1.4.2" :exclusions [org.clojure/clojure]]
-                 [enclog "0.5.8-SNAPSHOT"] 
+                 [enclog "0.5.8"] 
                  ]
   :dev-dependencies [[[midje "1.5-alpha2"]]]               
   ;:plugins [[lein-swank "1.4.4"]]             

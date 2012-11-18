@@ -189,12 +189,9 @@
                       :selection piece)
           (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and clicked loc is nil then do nothing
-  (some #{le-loc} (core/getMoves (:selection @knobs) (peek @core/board-history) true))
-   (do (core/execute! 
-       (core/dest->Move (peek @core/board-history) 
-                        (:selection @knobs) 
-                        le-loc
-                        (:mover @curr-game)) (:board-atom @curr-game))
+:else (when-let [sel-move (some #(when (= le-loc (:end-pos %)) %) 
+                                (core/getMoves (:selection @knobs) (peek @core/board-history) true))]
+   (core/execute! sel-move (:board-atom @curr-game))
       (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))];check if we have a winner 
       (do (ssw/alert (str "GAME OVER...\n " res))
           (knob! :block? true))) ;block movements if someone won               

@@ -160,7 +160,7 @@
 "Deserializes the object  in file f from the disk using Java serialization. 
  Filename needs no extension - it will be appended (.ser)." 
 ^clojure.lang.PersistentVector [fname]
-(with-local-vars[upb nil]  ;;waiting for the value shortly
+(with-local-vars [upb nil]  ;;waiting for the value shortly
   (with-open [oin (java.io.ObjectInputStream. 
                   (java.io.FileInputStream. (str fname ".ser")))] 
                   (var-set upb (.readObject oin)))
