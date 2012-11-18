@@ -139,9 +139,9 @@
                                                          (keyword rank)])
                              (map #(core/dest->Move b this % nil)))
                            (conj (castling-moves b this))) ;;casting is a move of the king's
-                    :else (->> (get-in buffered-moves [(core/translate-position x y board-mappings-chess) 
-                                                       (keyword rank)])
-                            (map #(core/dest->Move b this % nil))))))) ;returns a list of Move objects 
+                     (->> (get-in buffered-moves [(core/translate-position x y board-mappings-chess) 
+                                                  (keyword rank)])
+                       (map #(core/dest->Move b this % nil))))))) ;returns a list of Move objects 
  Object
  (toString [this] 
    (println "ChessItem (" rank ") at position:" (core/getListPosition this) " ->" position)) )
