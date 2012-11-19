@@ -130,7 +130,7 @@
     (core/remove-illegal #(or 
                              (core/collides? % 
                                (ut/make-walker 
-                                 (ut/resolve-direction position (do println (:end-pos %) (:end-pos %))) rank) b board-mappings-chess)
+                                 (ut/resolve-direction position (do (println (:end-pos %)) (:end-pos %))) rank) b board-mappings-chess)
                             (core/exposes? % (when with-precious? 'king)))    
                   (case rank 
                     pawn (->> ((:pawn chess-moves)  b x y direction)
