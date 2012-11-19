@@ -261,13 +261,15 @@
 
 (defn set-laf! "Set look and feel of the ui, provided its name as a string."  
 [laf-name]
-(when-let [lf1 (some #(when (= laf-name (.getName %)) %) (UIManager/getInstalledLookAndFeels))]
+(when-let [lf1 (some #(when (= laf-name (.getName %)) %)
+                     (UIManager/getInstalledLookAndFeels))]
  (UIManager/setLookAndFeel (.getClassName lf1))))
  
 
 (defmethod canva-react 'Checkers [^MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e)) ;;(seesaw.mouse/location e)
-      piece (identify-p (:mappings @curr-game) (peek @core/board-history) spot)
+      board (peek @core/board-history)
+      piece (identify-p (:mappings @curr-game) board spot)
       sel   (:selection @knobs)]
 (cond 
   (or
@@ -278,22 +280,21 @@
                       :selection piece)
              (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
- (and (some #{(vec (map (ut/balance :down) spot))} (map :end-pos 
-                                                ((:team-moves @curr-game)  
-                                                (peek @core/board-history) 
-                                                      (get-in @knobs [:selection :direction]))))
-  (some #{(vec (map (ut/balance :down) spot))} (core/getMoves (:selection @knobs) (peek @core/board-history) nil)))
-   (do (core/execute! 
-       (core/dest->Move (peek @core/board-history) 
-                        (:selection @knobs) 
-                        (vec (map (ut/balance :down) spot))
-                        (:mover @curr-game)) (:board-atom @curr-game)) 
-       (refresh :whose-turn (turn (get-in @knobs [:selection :direction]))
-                :highlighting? false
-                :hint nil
-                :selection nil)
-       (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))
-       (ssw/repaint! canvas)))))
+:else 
+  (let [sen-spot (mapv (ut/balance :down) spot)
+        sel-move (core/dest->Move board sel sen-spot (:mover @curr-game))]
+(when 
+ (and (some #(when (= sen-spot (:end-pos %)) %)
+            ((:team-moves @curr-game) board (:direction sel)))
+  (some #(when (= sen-spot (:end-pos %)) %)
+        (core/getMoves sel board nil)))
+   (core/execute! sel-move (:board-atom @curr-game)) 
+   (refresh :whose-turn (turn (:direction sel))
+            :highlighting? false
+            :hint nil
+            :selection nil)
+   (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))
+    (ssw/repaint! canvas))))))
 
 (defn request-canva-repaint []
 (ssw/repaint! canvas))

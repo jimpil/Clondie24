@@ -26,39 +26,26 @@
                      :prince   (partial rul/prince-moves board-mappings-checkers)})
 (def prince-row {1 7 
                 -1 0})                     
-                     
-#_(defn rank->moves 
-"Returns all legal moves of piece p depending on rank of p (excluding pawn). Will be called only once to buffer the moves." 
-[p]
-(let [pos (:position p)           
-      r (keyword (:rank p))
-      d (:direction p)]      
-(apply (r checker-moves) pos))) ;will return a fn which is called with current x and y
+                
 
 (definline jump? [s e]
 `(-> (Math/abs (- (first ~e) 
                   (first ~s))) 
       (rem  2)
-      (= 0))) 
-                                 
+      (= 0)))                                  
                                                             
 #_(defn between [sp ep]
 (ut/walk (ut/resolve-direction sp ep) sp))
 
 (defn move [board p coords]
-(if (jump? (:position p) coords)
+(if-not (jump? (:position p) coords) (core/move board p coords) ;;use the one from core if there is no jump
 (let [newPiece (core/update-position p coords)
       old-pos  (core/getListPosition p)
-      new-pos  (core/getListPosition newPiece)]
-(-> board 
-     (transient)  
-     (assoc! old-pos nil) 
-     (assoc! new-pos newPiece) 
-     (assoc! (let [[bx by] (ut/walk (ut/resolve-direction (:position p) coords) (:position p))]  ;the piece in between
-                (core/translate-position bx by board-mappings-checkers)) nil)
-     (persistent!)))
-(core/move board p coords))) ;;use the one from core if there is no kill
-
+      new-pos  (core/getListPosition newPiece)
+      [bx by] (ut/walk (ut/resolve-direction (:position p) coords) (:position p))] ;the piece in between
+(assoc board old-pos nil
+             new-pos newPiece
+            (core/translate-position bx by board-mappings-checkers)  nil))))
      
      
 (definline team-moves "Jumps have priority." [b dir & more]
@@ -72,16 +59,15 @@
  core/Piece 
  (update-position [this np] (if (and (= (second np) (get prince-row direction))
                                      (= rank 'soldier)) (core/promote this np) 
-                                (->CheckersPiece image np rank value direction {:alive true} nil)))
+                                (CheckersPiece. image np rank value direction {:alive true} nil)))
  (die     [this] (vary-meta this assoc :alive false)) ;communicate death through meta-data 
- (promote [this np] (->CheckersPiece (get-in checkers-images [:prince direction]) np 'prince 3 direction {:alive true} nil)) ; a checker is promoted to prince (king)
+ (promote [this np] (CheckersPiece. (get-in checkers-images [:prince direction]) np 'prince 3 direction {:alive true} nil)) ; a checker is promoted to prince (king)
  (getListPosition [this] (core/translate-position  (first  position) 
                                                    (second position) board-mappings-checkers))
  (getPoint [this] (ut/make-point position))
  (getMoves [this b _] 
                   (let [[x y] position]
                    (map #(core/dest->Move b this % move)   ;;our specific mover
-                  ;(map #(with-meta % {:jump? (jump? position %)}) 
                    (((keyword rank) checkers-moves) b x y direction))))
  Object
  (toString [this] 
