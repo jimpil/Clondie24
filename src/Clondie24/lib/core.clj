@@ -184,18 +184,18 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (definline bury-dead [c]
  `(filter alive? ~c))  
 
-(definline collides? 
+(defn collides? 
 "Returns true if the move collides with any friendly pieces. 
  The move will be walked step by step by the walker fn."
 [move walker b m] ;last 2 can be false, nil
-`(let [[epx# epy# :as ep#]  (:end-pos ~move)
-       dir# (get-in ~move [:p :direction])]                                         
-(loop [[imm-px# imm-py# :as imm-p#] (if (nil? ~walker) ep# (~walker (getOrigin ~move)))] ;if walker is nil make one big step to the end       
+(let [[epx epy :as ep]  (:end-pos move)
+       dir (get-in move [:p :direction])]                                         
+(loop [[imm-px imm-py :as imm-p] (if (nil? walker) ep (~walker (getOrigin move)))] ;if walker is nil make one big step to the end       
 (cond  
-  (=  imm-p# ep#) ;if reached destination there is potential for attack
-       (if (not= dir# (:direction (get ~b (translate-position epx# epy# ~m)))) false true)    
-  (not (nil? (get ~b (translate-position imm-px# imm-py# ~m)))) true
-:else (recur (~walker imm-p#))))))
+  (=  imm-p ep) ;if reached destination there is potential for attack
+       (if-not (= dir (:direction (get b (translate-position epx epy m)))) false true)    
+  (not (nil? (get b (translate-position imm-px imm-py m)))) true
+:else (recur (walker imm-p))))))
 
 (defn acollides? "Same as 'collides?' but deals with an array as b - not a vector."
 [[sx sy] [ex ey] walker b m dir]
