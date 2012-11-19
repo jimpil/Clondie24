@@ -139,7 +139,7 @@
                             (->> (get-in buffered-moves 
                                     [(core/translate-position x y board-mappings-chess) :king])
                              (map move-creator))
-                           (conj (castling-moves b this))) ;;casting is a move of the king's
+                           (list* (castling-moves b this))) ;;casting is a move of the king's
                      (->> (get-in buffered-moves
                               [(core/translate-position x y board-mappings-chess) (keyword rank)])
                        (map move-creator)))))) ;returns a list of Move objects 
