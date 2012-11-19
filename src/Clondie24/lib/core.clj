@@ -190,7 +190,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 [move walker b m] ;last 2 can be false, nil
 `(let [[epx# epy# :as ep#]  (:end-pos ~move)
        dir# (get-in ~move [:p :direction])]                                         
-(loop [[imm-px# imm-py# :as imm-p#] (if (nil? walker) ep# (~walker (getOrigin ~move)))] ;if walker is nil make one big step to the end       
+(loop [[imm-px# imm-py# :as imm-p#] (if (nil? ~walker) ep# (~walker (getOrigin ~move)))] ;if walker is nil make one big step to the end       
 (cond  
   (=  imm-p# ep#) ;if reached destination there is potential for attack
        (if-not (= dir# (:direction (get ~b (translate-position epx# epy# ~m)))) false true)    
