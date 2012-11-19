@@ -186,12 +186,13 @@
     (and (not (nil? sel)) (= (:direction piece) (:direction sel)))) 
        (do (refresh :highlighting? false 
                       :hint nil
-                      :selection piece) (println "selected" piece)
+                      :selection piece)
           (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and clicked loc is nil then do nothing
 :else (when-let [sel-move (some #(when (= le-loc (:end-pos %)) %) 
-                                (core/getMoves (:selection @knobs) (peek @core/board-history) nil))] ;;TODO URGENT!
-   (core/execute! sel-move (:board-atom @curr-game))
+                                (core/getMoves (:selection @knobs) (peek @core/board-history) false))] ;;TODO URGENT!
+   (core/execute! sel-move (:board-atom @curr-game)) 
+        (println "MOVE EXECUTED!")
       (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))];check if we have a winner 
       (do (ssw/alert (str "GAME OVER...\n " res))
           (knob! :block? true))) ;block movements if someone won               
