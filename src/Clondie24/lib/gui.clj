@@ -13,9 +13,6 @@
                 :highlighting? false
                 :block? false 
                 :hint nil
-                :aux1 nil 
-                :aux2 nil
-                :aux3 nil
                 :whose-turn "Yellow"})
 
 (def knobs "Various knobs for the gui. Better keep them together."
@@ -44,26 +41,25 @@
 (defmacro with-worker 
 "Starts a background worker thread with busy cursor on component c while busy. 
  When no storage is provided you must call .get on the result to get the value of 'job' (if it returns anything)." 
-[c job storage]
+[c storage & jobs]
 `(do (ssw/config! ~c :cursor :wait)
  (doto (proxy [SwingWorker] []
-       (doInBackground [] (if (nil? ~storage) ~job 
-                              (knob! ~storage ~job)))
+       (doInBackground [] (if (nil? ~storage) ~@jobs 
+                              (knob! ~storage ~@jobs)))
        (done [] (ssw/repaint! ~c) 
                 (ssw/config! ~c :cursor :default)))       
  (.execute))))
  
 (defmacro with-busy-cursor 
-"Starts a future to execute a job with busy cursor whilst busy, on component c. 
+"Starts a future to execute some jobs with busy cursor whilst busy, on component c. 
  Optionally if we want a result back we need to provide a place to save it.
  3 auxilliary slots are provided in knobs in case you need some."
- [c job storage-key] 
-`(do (ssw/config! ~c :cursor :wait)
-  (future (if (nil? ~storage-key) (with-block ~job)
-  (do (knob! ~storage-key (with-block ~job)) 
+ [c storage-key & jobs] 
+ `(future (ssw/config! ~c :cursor :wait) 
+             (knob! ~storage-key (with-block ~@jobs))
       (ssw/invoke-later (ssw/repaint! ~c) 
                         (ssw/config! ~c :cursor :default)
-                        (.. Toolkit getDefaultToolkit beep)))))))
+                        (.. Toolkit getDefaultToolkit beep))))
       
 
 (defn clear! "Clears everything (history and current board)." [] 
@@ -155,14 +151,13 @@
   (let [sel (:selection @knobs)
         tile-size (:tile-size @curr-game)]
  (when (and (not (nil? sel)) (or (:hint @knobs) 
-                                                 (:highlighting? @knobs))) 
- (let [pmvs (if-let [h (:hint @knobs)] (list (get-in h [:move :end-pos])) ;expecting a hint?
+                                  (:highlighting? @knobs))) 
+ (let [pmvs (if-let [h (:hint @knobs)] (list (:move h)) ;expecting a hint?
                 (core/getMoves sel (peek @core/board-history) true)) ;getMoves of selected piece
        balancer (ut/balance :up tile-size)]
    (doseq [m pmvs]
-    ; (println (:end-pos m))
      (let [[x y :as end-pos] (:end-pos m)
-           [rx ry] (mapv balancer (if (coll? x) x end-pos))]
+           [rx ry] (mapv balancer (if (sequential? x) x end-pos))]
      (.setColor g (ut/predefined-color 'green))
      (.setComposite ^Graphics2D g (AlphaComposite/getInstance 
                                    AlphaComposite/SRC_OVER (float 0.5)))
@@ -245,9 +240,9 @@
                                                                          :hint nil) 
                                                                 (ssw/repaint! canvas))))]) [:fill-h 10]
                         (ssw/button :text "Hint" :listen [:action (fn [e] (when-not (:block? @knobs)
-                                                     (do (knob! :highlighting? false) 
-                                                         (with-busy-cursor canvas 
-                                                          (hint (:pref-depth @curr-game)) :hint))))]) [:fill-h 10]])
+                                                      (knob! :highlighting? false) 
+                                                        (with-busy-cursor canvas 
+                                                           :hint (hint (:pref-depth @curr-game)))))]) [:fill-h 10]])
                :center canvas
                :south  status-label)))
               
@@ -255,8 +250,8 @@
 (defn hint "Ask the computer for a hint." 
 [depth] 
  ((:hinter @curr-game) 
-          (get-in @knobs [:selection :direction]) 
-          (peek @core/board-history) depth (:naive-scorer @curr-game)))
+    (get-in @knobs [:selection :direction]) 
+    (peek @core/board-history) depth (:naive-scorer @curr-game)))
           
 
 (defn set-laf! "Set look and feel of the ui, provided its name as a string."  
