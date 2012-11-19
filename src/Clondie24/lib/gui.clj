@@ -160,8 +160,8 @@
                 (core/getMoves sel (peek @core/board-history) true)) ;getMoves of selected piece
        balancer (ut/balance :up tile-size)]
    (doseq [m pmvs]
-     (let [end-pos (:end-pos m)
-           [rx ry] (mapv balancer (if (coll? end-pos) (first end-pos) end-pos))]
+     (let [[x y :as end-pos] (:end-pos m)
+           [rx ry] (mapv balancer (if (coll? x) x end-pos))]
      (.setColor g (ut/predefined-color 'green))
      (.setComposite ^Graphics2D g (AlphaComposite/getInstance 
                                    AlphaComposite/SRC_OVER (float 0.5)))

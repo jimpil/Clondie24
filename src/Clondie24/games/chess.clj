@@ -131,8 +131,9 @@
                              (core/collides? % 
                                (ut/make-walker 
                                  (ut/resolve-direction position  
-                                                       (let [ep (:end-pos %)] ;;the first move is what matters
-                                                        (if (coll? ep) (first ep) ep))) 
+                                                       (let [ep (:end-pos %)
+                                                             fep (first ep)] ;;the first move is what matters
+                                                        (if (coll? fep) fep ep))) 
                                  rank) b board-mappings-chess)
                             (core/exposes? % (when with-precious? 'king)))    
                   (case rank 
