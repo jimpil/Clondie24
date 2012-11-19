@@ -188,7 +188,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 "Returns true if the move collides with any friendly pieces. 
  The move will be walked step by step by the walker fn."
 [move walker b m] ;last 2 can be false, nil
-`(let [[epx# epy# :as ep#]  (:end-pos ~move)
+`(let [fep#  (:end-pos ~move)
+       [epx# epy# :as ep#]  (if (coll? fep#) (first fep#) fep#)
        dir# (get-in ~move [:p :direction])]                                         
 (loop [[imm-px# imm-py# :as imm-p#] (if (nil? ~walker) ep# (~walker (getOrigin ~move)))] ;if walker is nil make one big step to the end       
 (cond  

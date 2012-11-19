@@ -160,7 +160,7 @@
                 (core/getMoves sel (peek @core/board-history) true)) ;getMoves of selected piece
        balancer (ut/balance :up tile-size)]
    (doseq [m pmvs]
-     (println (:end-pos m))
+    ; (println (:end-pos m))
      (let [[x y :as end-pos] (:end-pos m)
            [rx ry] (mapv balancer (if (coll? x) x end-pos))]
      (.setColor g (ut/predefined-color 'green))
