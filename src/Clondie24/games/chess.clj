@@ -133,7 +133,7 @@
                                  (ut/resolve-direction position  
                                                        (let [ep (:end-pos %)] 
                                                         (if (coll? ep) (first ep) ep)) 
-                                 rank) b board-mappings-chess)
+                                 rank) b board-mappings-chess))
                             (core/exposes? % (when with-precious? 'king)))    
                   (case rank 
                     pawn (->> ((:pawn chess-moves)  b x y direction)
