@@ -169,7 +169,10 @@
 (defn data->string
 "Writes the clojure data-structure b on a file f on disk as a string." 
 [b f]
-(io! (spit f b)))
+(io!
+(with-open [w (clojure.java.io/writer f)]
+  (binding [*out* w]
+    (pprint b)))))
 
 (defn string->data
 "Read the file f back on memory safely. Contents of f should be a clojure data-structure." 

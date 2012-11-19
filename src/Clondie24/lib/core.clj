@@ -165,12 +165,12 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  
 (definline team-moves "Filters all the moves for the team with direction 'dir' on this board b. Returns a reducer." 
 [b dir exposes-check?]
-`(let [team# (gather-team ~b ~dir) 
-       tmvs# (r/mapcat 
-                  (fn [p#] 
-                    ;(r/map #(dest->Move ~b p# % ~mover) 
-                            (getMoves p# ~b ~exposes-check?)) team#)]
- tmvs# ))
+`(let [team# (gather-team ~b ~dir)
+       t-king# (some #(= 'king (:rank %)) (into [] team#))] ;missing king?
+   (when t-king#      
+     (r/mapcat 
+        (fn [p#] 
+          (getMoves p# ~b ~exposes-check?)) team#))))
 
 
 (defn vacant? 
@@ -218,7 +218,6 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                     (get-in ~move [:p :direction]))
          def-prec#  (some #(when (and (= ~precious (:rank %)) 
                                        (= dir# (:direction %))) %) next-b#)]
-   ;(println "EXPOSES" (:end-pos move))
    (some #(threatens? def-prec# % next-b#) 
      (into [] (gather-team next-b# (- dir#))))))) 
 
