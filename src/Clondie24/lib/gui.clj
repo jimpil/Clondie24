@@ -81,7 +81,7 @@
 "Returns the piece that corresponds to the coordinates on this board." 
 [m b cl-coords]
 (let [balancer (ut/balance :down (:tile-size @curr-game))
-      [bx by] (map balancer cl-coords)
+      [bx by] (mapv balancer cl-coords)
       l-pos (core/translate-position bx by m)
       f-piece (get b l-pos)]
 (when-not (nil? f-piece) f-piece)))
@@ -184,9 +184,9 @@
   (or
     (and (nil? sel) (not (nil? piece)))           
     (and (not (nil? sel)) (= (:direction piece) (:direction sel)))) 
-       (do(refresh :highlighting? false 
+       (do (refresh :highlighting? false 
                       :hint nil
-                      :selection piece)
+                      :selection piece) (println "selected" piece)
           (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and clicked loc is nil then do nothing
 :else (when-let [sel-move (some #(when (= le-loc (:end-pos %)) %) 
