@@ -232,19 +232,19 @@
   #(walk direction %)))
                    
           
-(defn resolve-direction 
+(definline resolve-direction 
 [sp ep]
- (let [dx (- (first ep) (first sp))
-       dy (- (second ep) (second sp))]
+`(let [dx# (- (first ~ep) (first ~sp))
+       dy# (- (second ~ep) (second ~sp))]
 (cond 
-   (and (neg? dx)  (zero? dy)) :west
-   (and (pos? dx)  (zero? dy)) :east
-   (and (pos? dx)  (pos?  dy)) :south-east
-   (and (pos? dx)  (neg?  dy)) :north-east
-   (and (zero? dx) (pos? dy))  :south
-   (and (zero? dx) (neg? dy))  :north
-   (and (neg? dx)  (neg? dy))  :north-west
-   (and (neg? dx)  (pos? dy))  :south-west)))  
+   (and (neg? dx#)  (zero? dy#)) :west
+   (and (pos? dx#)  (zero? dy#)) :east
+   (and (pos? dx#)  (pos?  dy#)) :south-east
+   (and (pos? dx#)  (neg?  dy#)) :north-east
+   (and (zero? dx#) (pos? dy#))  :south
+   (and (zero? dx#) (neg? dy#))  :north
+   (and (neg? dx#)  (neg? dy#))  :north-west
+   (and (neg? dx#)  (pos? dy#))  :south-west)))  
    
         
     

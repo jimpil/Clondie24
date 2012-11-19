@@ -206,14 +206,14 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
   (not (nil? (aget  b (translate-position imm-x imm-y m)))) true
 :else (recur (walker [imm-x imm-y])))))
 
-(defn exposes? [move precious]
- (if-not precious false ;skip everything
-   (let [next-b (try-move move)
-         dir    (get-in move [:p :direction])
-         def-prec  (some #(when (and (= precious (:rank %)) 
-                                       (= dir (:direction %))) %) next-b)]
-   (some #(threatens? def-prec % next-b) 
-     (into [] (gather-team next-b (- dir))))))) 
+(definline exposes? [move precious]
+`(if-not ~precious false ;skip everything
+   (let [next-b# (try-move ~move)
+         dir#    (get-in ~move [:p :direction])
+         def-prec#  (some #(when (and (= ~precious (:rank %)) 
+                                       (= dir# (:direction %))) %) next-b#)]
+   (some #(threatens? def-prec# % next-b#) 
+     (into [] (gather-team next-b# (- dir#))))))) 
 
 
 (defn score-chess-naive ^double [b dir]
