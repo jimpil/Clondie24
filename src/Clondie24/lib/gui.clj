@@ -194,8 +194,8 @@
    (core/execute! sel-move (:board-atom @curr-game)) 
         (println "MOVE EXECUTED!")
       (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))];check if we have a winner 
-      (do (ssw/alert (str "GAME OVER...\n " res))
-          (knob! :block? true))) ;block movements if someone won               
+       (ssw/alert (str "GAME OVER...\n " res))
+       (knob! :block? true)) ;block movements if someone won               
        (refresh :whose-turn (turn (get-in @knobs [:selection :direction]))
                 :highlighting? false
                 :hint nil
