@@ -164,7 +164,7 @@
      (.setColor g (ut/predefined-color 'green))
      (.setComposite ^Graphics2D g (AlphaComposite/getInstance 
                                    AlphaComposite/SRC_OVER (float 0.5)))
-     (.fillRect g rx ry tile-size tile-size))))))           
+     (.fillRect g rx ry tile-size tile-size)))))))           
         
 (defn draw-tiles [d ^Graphics g]
   (let [tile-size (:tile-size @curr-game)]  
