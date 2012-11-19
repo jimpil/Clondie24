@@ -132,10 +132,10 @@
                                (ut/make-walker 
                                  (ut/resolve-direction position (:end-pos %)) rank) b board-mappings-chess)
                             (core/exposes? % (when with-precious? 'king)))    
-                  (condp = rank 
-                    'pawn (->> ((:pawn chess-moves)  b x y direction)
+                  (case rank 
+                    pawn (->> ((:pawn chess-moves)  b x y direction)
                             (map move-creator))
-                    'king (->
+                    king (->
                             (->> (get-in buffered-moves 
                                     [(core/translate-position x y board-mappings-chess) :king])
                              (map move-creator))
