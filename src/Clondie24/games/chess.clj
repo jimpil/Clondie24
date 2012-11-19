@@ -122,7 +122,7 @@
                                                                             :has-moved? true} nil)))
  (die [this]     (vary-meta this assoc :alive false)) ;communicate death through meta-data 
  (promote [this np] (ChessPiece. (get-in chess-images [:queen direction]) np 'queen 9 direction)) ;a pawn is promoted to a queen
- (getListPosition [this] (core/translate-position (first  position) (second position) board-mappings-chess))
+ (getListPosition [this] (core/translate-position (first position) (second position) board-mappings-chess))
  (getPoint [this] (ut/make-point position))
  (getMoves [this b with-precious?]
   (let [[x y] position

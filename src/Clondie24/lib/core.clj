@@ -131,7 +131,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defrecord Move [p mover ^clojure.lang.PersistentVector end-pos]
  Movable
  (try-move [this]  (with-meta (mover p end-pos) {:caused-by this})) ;;the board returned was caused by this move
- (getOrigin [this] (:position p))
+ (getOrigin [this] (if (coll? p)  
+                     (:position (first p))
+                     (:position p)))
  Object
  (toString [this] 
    (println "#Move {:from" (:position p) ":to" end-pos)))   
@@ -188,8 +190,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 "Returns true if the move collides with any friendly pieces. 
  The move will be walked step by step by the walker fn."
 [move walker b m] ;last 2 can be false, nil
-`(let [fep#  (:end-pos ~move)
-       [epx# epy# :as ep#]  (if (coll? fep#) (first fep#) fep#)
+`(let [ppp#  (:end-pos ~move)
+       fep#  (first ppp#)
+       [epx# epy# :as ep#]  (if (coll? fep#) fep# ppp#)
        dir# (get-in ~move [:p :direction])]                                         
 (loop [[imm-px# imm-py# :as imm-p#] (if (nil? ~walker) ep# (~walker (getOrigin ~move)))] ;if walker is nil make one big step to the end       
 (cond  
