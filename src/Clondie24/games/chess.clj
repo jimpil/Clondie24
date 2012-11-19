@@ -126,11 +126,14 @@
  (getPoint [this] (ut/make-point position))
  (getMoves [this b with-precious?]
   (let [[x y] position
-        move-creator #(core/dest->Move b this % nil)]
+        move-creator #(core/dest->Move b this % nil)] 
     (core/remove-illegal #(or 
                              (core/collides? % 
                                (ut/make-walker 
-                                 (ut/resolve-direction position  (:end-pos %)) rank) b board-mappings-chess)
+                                 (ut/resolve-direction position  
+                                                       (if-let [ep (:end-pos %)] 
+                                                         (coll? ep) (first ep) ep)) 
+                                 rank) b board-mappings-chess)
                             (core/exposes? % (when with-precious? 'king)))    
                   (case rank 
                     pawn (->> ((:pawn chess-moves)  b x y direction)
