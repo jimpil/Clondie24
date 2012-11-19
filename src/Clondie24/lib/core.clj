@@ -131,9 +131,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defrecord Move [p mover ^clojure.lang.PersistentVector end-pos]
  Movable
  (try-move [this]  (with-meta (mover p end-pos) {:caused-by this})) ;;the board returned was caused by this move
- (getOrigin [this] (if (coll? p)  
-                     (:position (first p))
-                     (:position p)))
+ (getOrigin [this] (if (map? p) (:position p)
+                                (:position (first p))))
  Object
  (toString [this] 
    (println "#Move {:from" (:position p) ":to" end-pos)))   
@@ -191,13 +190,14 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  The move will be walked step by step by the walker fn."
 [move walker b m] ;last 2 can be false, nil
 `(let [ppp#  (:end-pos ~move)
-       fep#  (first ppp#)
-       [epx# epy# :as ep#]  (if (coll? fep#) fep# ppp#)
-       dir# (get-in ~move [:p :direction])]                                         
+       multi-move?# (if (sequential? (first ppp#)) true false)
+       [epx# epy# :as ep#]  (if multi-move?# (first ppp#) ppp#)
+       dir# (if multi-move?# (get-in ~move [:p 0 :direction])
+                             (get-in ~move [:p :direction]))]                                        
 (loop [[imm-px# imm-py# :as imm-p#] (if (nil? ~walker) ep# (~walker (getOrigin ~move)))] ;if walker is nil make one big step to the end       
 (cond  
   (=  imm-p# ep#) ;if reached destination there is potential for attack
-       (if-not (= dir# (:direction (get ~b (translate-position epx# epy# ~m)))) false true)    
+       (if-not (= dir# (:direction (get ~b (translate-position epx# epy# ~m)))) false true)   
   (not (nil? (get ~b (translate-position imm-px# imm-py# ~m)))) true
 :else (recur (~walker imm-p#))))))
 
@@ -213,9 +213,12 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (definline exposes? [move precious]
 `(if-not ~precious false ;skip everything
    (let [next-b# (try-move ~move)
-         dir#    (get-in ~move [:p :direction])
+         ipiece#  (first (:p ~move)) 
+         dir#     (if (map? ipiece#) (:direction ipiece#) 
+                    (get-in ~move [:p :direction]))
          def-prec#  (some #(when (and (= ~precious (:rank %)) 
                                        (= dir# (:direction %))) %) next-b#)]
+   ;(println "EXPOSES" (:end-pos move))
    (some #(threatens? def-prec# % next-b#) 
      (into [] (gather-team next-b# (- dir#))))))) 
 

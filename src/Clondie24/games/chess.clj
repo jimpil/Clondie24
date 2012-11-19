@@ -131,9 +131,8 @@
                              (core/collides? % 
                                (ut/make-walker 
                                  (ut/resolve-direction position  
-                                                       (let [ep (:end-pos %)
-                                                             fep (first ep)] ;;the first move is what matters
-                                                        (if (coll? fep) fep ep))) 
+                                                       (let [ep (:end-pos %)] ;;the first move is what matters
+                                                        (if (sequential? (first ep)) (first ep) ep))) 
                                  rank) b board-mappings-chess)
                             (core/exposes? % (when with-precious? 'king)))    
                   (case rank 
@@ -143,9 +142,9 @@
                                     [(core/translate-position x y board-mappings-chess) :king])
                             (map move-creator)
                             (concat (castling-moves b this))) ;;casting is a move of the king's
-                     (->> (get-in buffered-moves
-                              [(core/translate-position x y board-mappings-chess) (keyword rank)])
-                       (map move-creator)))))) ;returns a list of Move objects 
+                          (->> (get-in buffered-moves
+                                    [(core/translate-position x y board-mappings-chess) (keyword rank)])
+                             (map move-creator)))))) ;returns a list of Move objects 
  Object
  (toString [this] 
    (println "Chess-item (" rank ") at position:" (core/getListPosition this) " ->" position)) )
@@ -247,7 +246,7 @@
   (remove nil? castlings))))
 ;(let [cas-moves (castling-moves ~b ~king)]
 ;;(if-not cas-moves team-moves 
-;;  (conj team-moves cas-moves)))
+;;  (concat team-moves cas-moves)))
                
                       
 (defmacro definvokable
