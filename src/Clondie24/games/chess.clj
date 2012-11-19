@@ -134,15 +134,15 @@
                             (core/exposes? % (when with-precious? 'king)))    
                   (case rank 
                     pawn (->> ((:pawn chess-moves)  b x y direction)
-                            (map move-creator))
+                            (mapv move-creator))
                     king (->
                             (->> (get-in buffered-moves 
                                     [(core/translate-position x y board-mappings-chess) :king])
-                             (map move-creator))
+                             (mapv move-creator))
                            (conj (castling-moves b this))) ;;casting is a move of the king's
                      (->> (get-in buffered-moves
                               [(core/translate-position x y board-mappings-chess) (keyword rank)])
-                       (map move-creator)))))) ;returns a list of Move objects 
+                       (mapv move-creator)))))) ;returns a list of Move objects 
  Object
  (toString [this] 
    (println "Chess-item (" rank ") at position:" (core/getListPosition this) " ->" position)) )

@@ -190,7 +190,7 @@
           (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and clicked loc is nil then do nothing
 :else (when-let [sel-move (some #(when (= le-loc (:end-pos %)) %) 
-                                (core/getMoves (:selection @knobs) (peek @core/board-history) false))] ;;TODO URGENT!
+                                (core/getMoves (:selection @knobs) (peek @core/board-history) true))] ;;TODO URGENT!
    (core/execute! sel-move (:board-atom @curr-game)) 
         (println "MOVE EXECUTED!")
       (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))];check if we have a winner 

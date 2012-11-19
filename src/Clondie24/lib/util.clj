@@ -215,7 +215,7 @@
 (map inspect-table bs))
 
 (defn walk* [direction [sx sy]]
-(condp = direction
+(case  direction
           :north [sx (dec sy)]
           :south [sx (inc sy)]
           :east  [(inc sx) sy]
@@ -228,7 +228,7 @@
 (def walk (memoize walk*))          
 
 (defn make-walker [direction rank]
-(when-not (= rank 'knight) ;;knight jumps - doesn't walk'
+(when-not (= rank 'knight) ;;knight jumps - doesn't walk
   #(walk direction %)))
                    
           
