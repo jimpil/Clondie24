@@ -152,17 +152,19 @@
      
     
 (defn highlight-rects [^Graphics g]
- (when (and (not (nil? (:selection @knobs))) (or (:hint @knobs) 
+  (let [sel (:selection @knobs)
+        tile-size (:tile-size @curr-game)]
+ (when (and (not (nil? sel)) (or (:hint @knobs) 
                                                  (:highlighting? @knobs))) 
  (let [pmvs (if-let [h (:hint @knobs)] (list (get-in h [:move :end-pos])) ;expecting a hint?
-                (core/getMoves (:selection @knobs) (peek @core/board-history) true)) ;getMoves of selected piece
-       balancer (ut/balance :up (:tile-size @curr-game))]
+                (core/getMoves sel (peek @core/board-history) true)) ;getMoves of selected piece
+       balancer (ut/balance :up tile-size)]
    (doseq [m pmvs]
-     (let [[rx ry] (mapv balancer m)]
+     (let [[rx ry] (mapv balancer (:end-pos m))]
      (.setColor g (ut/predefined-color 'green))
      (.setComposite ^Graphics2D g (AlphaComposite/getInstance 
                                    AlphaComposite/SRC_OVER (float 0.5)))
-     (.fillRect g rx ry 50 50))))))           
+     (.fillRect g rx ry tile-size tile-size))))))           
         
 (defn draw-tiles [d ^Graphics g]
   (let [tile-size (:tile-size @curr-game)]  
@@ -200,7 +202,7 @@
                 :hint nil
                 :selection nil);;;;;;;;;;;;
        (ssw/repaint! canvas)
-       (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))))))      
+       (ssw/config! status-label :text (str (:whose-turn @knobs) "moves next..."))))))      
             
  
 (def canvas "The paintable canvas - our board"
