@@ -140,8 +140,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn dest->Move 
  "Constructor for creating moves from destinations. 
  It wouldn't make sense to pass more than 1 mover-fns." 
-[b p dest mover]  (if (nil? mover) (Move. p (partial move b) dest)
-                                   (Move. p (partial mover b) dest)))
+[b p dest mover]  
+(if (nil? mover) (Move. p (partial move b) dest)
+                 (Move. p (partial mover b) dest)))
 
 (defn execute! [^Move m batom]
  (reset! batom (try-move m)))
@@ -165,12 +166,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  
 (definline team-moves "Filters all the moves for the team with direction 'dir' on this board b. Returns a reducer." 
 [b dir exposes-check?]
-`(let [team# (gather-team ~b ~dir)
-       t-king# (some #(= 'king (:rank %)) (into [] team#))] ;missing king?
-   (when t-king#      
-     (r/mapcat 
-        (fn [p#] 
-          (getMoves p# ~b ~exposes-check?)) team#))))
+`(let [team# (gather-team ~b ~dir) ]    
+  (r/mapcat 
+    (fn [p#] 
+      (getMoves p# ~b ~exposes-check?)) team#)))
 
 
 (defn vacant? 
