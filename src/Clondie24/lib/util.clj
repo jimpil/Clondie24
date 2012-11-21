@@ -106,7 +106,7 @@
 (try 
   (javax.imageio.ImageIO/read (java.io.File. path-to-image))
 (catch java.io.IOException e ;returning nil here  
-  (println path-to-image "does not exist! Reverting to 'nil'..."))))
+  (println path-to-image "does not exist! Reverting to nil..."))))
 
 ;Helper fn for creting pre-defined Colours
 (defn predefined-color 
@@ -149,33 +149,33 @@
       (deref (:board-atom game))))  ;the rows
 
 (defn serialize! 
-"Serialize the object b on to the disk using Java serialization. 
+"Serialize the object b on to the disk using standard Java serialization. 
  Filename needs no extension - it will be appended (.ser)."
 [b fname]
 (with-open [oout (java.io.ObjectOutputStream. 
-                 (java.io.FileOutputStream. (str fname ".ser")))]
-                 (.writeObject oout b)))
+                  (java.io.FileOutputStream. fname))]
+                  (.writeObject oout b)))
                 
 (defn deserialize! 
-"Deserializes the object  in file f from the disk using Java serialization. 
+"Deserializes the object  in file f from the disk using standard Java serialization. 
  Filename needs no extension - it will be appended (.ser)." 
-^clojure.lang.PersistentVector [fname]
+^java.util.Collection [fname]
 (with-local-vars [upb nil]  ;;waiting for the value shortly
   (with-open [oin (java.io.ObjectInputStream. 
-                  (java.io.FileInputStream. (str fname ".ser")))] 
-                  (var-set upb (.readObject oin)))
+                   (java.io.FileInputStream. fname))] 
+                   (var-set upb (.readObject oin)))
        @upb))
+
        
 (defn data->string
-"Writes the clojure data-structure b on a file f on disk as a string." 
+"Writes the object b on a file f on disk as a string."
 [b f]
 (io!
 (with-open [w (clojure.java.io/writer f)]
-  (binding [*out* w]
-    (pprint b)))))
+  (binding [*out* w]  (prn b))))) 
 
 (defn string->data
-"Read the file f back on memory safely. Contents of f should be a clojure data-structure." 
+"Read the file f back on memory safely (no #=). Contents of f should be a clojure data-structure." 
 [f]
 (io! ;;throw if in transaction
  (binding [*read-eval* false]

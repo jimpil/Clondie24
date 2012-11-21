@@ -95,14 +95,16 @@
                         :tip  "Start new game." 
                         :key  "menu N")                           
       a-save (ssw/action :handler (fn [e] (choo/choose-file :type :save
-                                                            :filters [["Clojure-data" ["clo"]]] ;;use the reader for convenience
-                                                            :success-fn (fn [_ f] (ut/data->string @core/board-history f))))
+                                                            :filters [["Clojure-data" ["clo"]]] ;;use java serialisation for now
+                                                            :success-fn (fn [_ f] (ut/serialize! @core/board-history f))))
       
                         :name "Save" 
                         :tip "Save a game to disk." 
                         :key "menu S")
-      a-load (ssw/action :handler (fn [e]  (when-let [f (choo/choose-file :filters [["Clojure-data" ["clo"]]])]  
-                                           (reset! core/board-history (ut/string->data f))));;use the reader for convenience
+      a-load (ssw/action :handler (fn [e] 
+                                    (when-let [f (choo/choose-file :filters [["Clojure-data" ["clo"]]])]  
+                                    (reset! core/board-history (ut/deserialize! f)) ;;use java serialisation for now
+                                    (ssw/repaint! canvas)))
                         :name "Load" 
                         :tip  "Load a game from disk." 
                         :key  "menu L")
@@ -143,7 +145,7 @@
       balancer (ut/balance :up (:tile-size @curr-game))]
   (doseq [p ps]
   (let [[bx by] (mapv balancer (if (vector? (:position p)) (:position p) (ut/Point->Vec (:position p))));the balanced coords
-         pic (:image p)]  ;the actual picture
+         pic ((:image p))]  ;the actual picture
     (.drawImage g pic bx by nil)))))) ;finally call g.drawImage() 
      
     

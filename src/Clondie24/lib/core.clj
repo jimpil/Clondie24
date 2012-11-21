@@ -149,7 +149,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  
 (definline threatens? "Returns true if p2 is threatened by p1 on board b. This is the only time that we call getMoves with nil." 
 [p2 p1 b]
-`(some #{(:position ~p2)} (getMoves ~p1 ~b false)))
+`(some #{(:position ~p2)} 
+       (map :end-pos (getMoves ~p1 ~b false))))
 
 (defn undo! []
 (try (swap! board-history pop)
@@ -159,17 +160,19 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn clear-history! []
  (swap! board-history empty)) 
 
-(definline gather-team "Filters all the pieces with same direction dir on this board b. Returns a reducer." 
+(definline gather-team "Filters all the pieces with same direction dir on this board b." 
 [b dir]
-`(r/filter #(= ~dir (:direction %)) ~b)) ;all the team-mates (with same direction)
+`(filter
+   #(= ~dir (:direction %)) ~b)) ;all the team-mates (with same direction)
 
  
-(definline team-moves "Filters all the moves for the team with direction 'dir' on this board b. Returns a reducer." 
+(definline team-moves 
+"Returns all the moves (a reducer) for the team with direction 'dir' on this board b." 
 [b dir exposes-check?]
-`(let [team# (gather-team ~b ~dir) ]    
-  (r/mapcat 
-    (fn [p#] 
-      (getMoves p# ~b ~exposes-check?)) team#)))
+`(r/mapcat  
+   (fn [p#] 
+     (getMoves p# ~b ~exposes-check?)) 
+  (gather-team ~b ~dir)))
 
 
 (defn vacant? 
@@ -218,7 +221,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
          def-prec#  (some #(when (and (= ~precious (:rank %)) 
                                        (= dir# (:direction %))) %) next-b#)]
    (some #(threatens? def-prec# % next-b#) 
-     (into [] (gather-team next-b# (- dir#))))))) 
+     (gather-team next-b# (- dir#)))))) 
 
 
 (defn score-chess-naive ^double [b dir]

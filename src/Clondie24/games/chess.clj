@@ -112,7 +112,7 @@
 
 (def vacant-chess-tile? (partial core/vacant? board-mappings-chess))                         
 
-(defrecord ChessPiece [^java.awt.Image image 
+(defrecord ChessPiece [ image ;;not really an image but a fn that fetches the image
                        ^clojure.lang.PersistentVector position 
                         rank ^long value direction]
  core/Piece 
@@ -121,7 +121,7 @@
                                 (ChessPiece. image np rank value direction {:alive true 
                                                                             :has-moved? true} nil)))
  (die [this]     (vary-meta this assoc :alive false)) ;communicate death through meta-data 
- (promote [this np] (ChessPiece. (get-in chess-images [:queen direction]) np 'queen 9 direction)) ;a pawn is promoted to a queen
+ (promote [this np] (ChessPiece. #(get-in chess-images [:queen direction]) np 'queen 9 direction)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first position) (second position) board-mappings-chess))
  (getPoint [this] (ut/make-point position))
  (getMoves [this b with-precious?]
@@ -141,10 +141,10 @@
                     king  (->> (get-in buffered-moves 
                                     [(core/translate-position x y board-mappings-chess) :king])
                             (map move-creator)
-                            (concat (castling-moves b this))) ;;casting is a move of the king's
+                            (into (castling-moves b this))) ;;casting is a move of the king's
                           (->> (get-in buffered-moves
                                     [(core/translate-position x y board-mappings-chess) (keyword rank)])
-                             (map move-creator)))))) ;returns a list of Move objects 
+                             (map move-creator)))))) ;returns a lazy-seq of Move objects 
  Object
  (toString [this] 
    (println "Chess-item (" rank ") at position:" (core/getListPosition this) " ->" position)) )
@@ -174,10 +174,10 @@
 "Will construct a set of initial chess items (16). black? specifies the side of the board where the pieces should be placed (true for north false for south)."
 [black?]         
 (if black?  
-(map #(ChessPiece. (get-in chess-images [(keyword %2) 1])
+(map #(ChessPiece. (fn [] (get-in chess-images [(keyword %2) 1]))
       (core/translate-position % board-mappings-chess) %2
                        ((keyword %2) rel-values)  1 {:alive true :has-moved? false} nil) (range 16) chessPos->rank)
-(map #(ChessPiece. (get-in chess-images [(keyword %2) -1]) 
+(map #(ChessPiece. (fn [] (get-in chess-images [(keyword %2) -1])) 
       (core/translate-position % board-mappings-chess) %2
                       ((keyword %2) rel-values)  -1 {:alive true :has-moved? false} nil) (range 48 64) (flatten (reverse pos-groups)))))
                       
@@ -375,8 +375,8 @@ otherwise returns the last board. Intended to be used with genetic training."
 (defn naive-player [dir]
 (Player. core/score-chess-naive dir chess-best-move))        
 
-;(ut/data->string buffered-moves "performance.cheat") 
-(def buffered-moves (ut/string->data "performance.cheat"))  ;it's faster to read them from file than recalculate       
+(ut/data->string buffered-moves "machine-performance.cheat") 
+(def buffered-moves (ut/string->data "machine-performance.cheat"))  ;it's faster to read them from file than recalculate       
 
 (defn -main 
 "Starts a graphical (swing) Chess game." 
