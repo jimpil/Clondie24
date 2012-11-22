@@ -155,7 +155,7 @@
  (when (and (not (nil? sel)) (or (:hint @knobs) 
                                   (:highlighting? @knobs))) 
  (let [pmvs (if-let [h (:hint @knobs)] (list (:move h)) ;expecting a hint?
-                (core/getMoves sel (peek @core/board-history) true)) ;getMoves of selected piece
+                (core/getMoves sel (peek @core/board-history) true false)) ;getMoves of selected piece
        balancer (ut/balance :up tile-size)]
    (doseq [m pmvs]
      (let [[x y :as end-pos] (:end-pos m)
@@ -282,7 +282,7 @@
         sel-move (core/dest->Move board sel sen-spot (:mover @curr-game))]
 (when 
  (and (some #(when (= sen-spot (:end-pos %)) %)
-            ((:team-moves @curr-game) board (:direction sel)))
+            ((:team-moves @curr-game) board (:direction sel) false))
   (some #(when (= sen-spot (:end-pos %)) %)
         (core/getMoves sel board nil)))
    (core/execute! sel-move (:board-atom @curr-game)) 

@@ -42,8 +42,10 @@
  (promote [this np] (throw (IllegalStateException. "Tic-tac-toe pieces cannot be promoted!"))) 
  (getListPosition [this] (core/translate-position (first position) (second position) board-mappings-tic-tac-toe))
  (getPoint [this] (ut/make-point position))
- (getMoves [this b _] (loop [i 0 curr b
-                             vacant (list)]
+ (getMoves [this b _] (core/getMoves this b _ _)) 
+ (getMoves [this b _ _] (loop [i 0 
+                               curr b
+                               vacant (list)]
                        (if (empty? curr) vacant   
                        (recur (inc i) (rest curr) 
                         (if (nil? (first curr)) 

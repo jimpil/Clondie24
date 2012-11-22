@@ -8,7 +8,8 @@
               [enclog.training :as evol]
               [enclog.normalization :as norm] :verbose :reload)
     (:import  [encog_java.customGA CustomNeuralGeneticAlgorithm 
-                                   CustomGeneticScoreAdapter Referee])
+                                   CustomGeneticScoreAdapter Referee]
+              #_[Clondie24.lib.core Move])
 )
 
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
@@ -56,7 +57,7 @@
 `(s/go ~dir ~b ~n ~scorer))
 
 (defn chess-rand-move [dir b _ _] ;;need same arity as 'chess-best-move'
-(let [all-moves (into [] (core/team-moves b dir true))]
+(let [all-moves (into [] (core/team-moves b dir true false))]
 {:move (get all-moves (rand-int (count all-moves)))})) 
 
 (def current-chessItems
@@ -65,7 +66,7 @@
    (add-watch  :log (partial core/log-board core/board-history))
    #_(add-watch  :last-move (fn [k r old n] (swap! r conj n)))))
 
-(def chess-moves {:pawn     (partial rul/pawn-moves board-mappings-chess) 
+(def chess-moves {:pawn     #(rul/pawn-moves board-mappings-chess % %2 %3 %4) 
                   :rook      rul/rook-moves
                   :bishop    rul/bishop-moves
                   :knight    rul/knight-moves
@@ -101,8 +102,8 @@
      (:direction (first kings#))))) ;;return the direction of the king still standing 
      
 (definline gui-referee [b] ;referee a-la checkmate for the gui
-`(let [t1-moves# (into [] (core/team-moves ~b  1 true))
-       t2-moves# (into [] (core/team-moves ~b -1 true))]
+`(let [t1-moves# (into [] (core/team-moves ~b  1 true false))
+       t2-moves# (into [] (core/team-moves ~b -1 true false))]
  (cond 
     (empty? t1-moves#) "Yellow wins!"  
     (empty? t2-moves#) "Black wins!"   
@@ -124,9 +125,11 @@
  (promote [this np] (ChessPiece. #(get-in chess-images [:queen direction]) np 'queen 9 direction)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first position) (second position) board-mappings-chess))
  (getPoint [this] (ut/make-point position))
- (getMoves [this b with-precious?]
+ (getMoves [this b with-precious?] (core/getMoves this b with-precious? true))
+ (getMoves [this b with-precious? lazy?]
   (let [[x y] position
-        move-creator #(core/dest->Move b this % nil)] 
+        move-creator #(core/dest->Move b this % nil)
+        mapper (if lazy? map mapv)] 
     (core/remove-illegal #(or 
                              (core/collides? % 
                                (ut/make-walker 
@@ -137,14 +140,14 @@
                             (core/exposes? % (when with-precious? 'king)))    
                   (case rank 
                     pawn (->> ((:pawn chess-moves)  b x y direction)
-                            (map move-creator))
+                            (mapper move-creator))
                     king  (->> (get-in buffered-moves 
                                     [(core/translate-position x y board-mappings-chess) :king])
-                            (map move-creator)
+                            (mapper move-creator)
                             (into (castling-moves b this))) ;;casting is a move of the king's
                           (->> (get-in buffered-moves
                                     [(core/translate-position x y board-mappings-chess) (keyword rank)])
-                             (map move-creator)))))) ;returns a lazy-seq of Move objects 
+                             (mapper move-creator)))))) ;returns a lazy-seq of Move objects 
  Object
  (toString [this] 
    (println "Chess-item (" rank ") at position:" (core/getListPosition this) " ->" position)) )

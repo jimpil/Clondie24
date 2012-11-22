@@ -64,7 +64,7 @@
                 
 (defn next-level [b ^long dir] 
  (r/map #(Move->Board. % (core/try-move %)) 
-   ((:team-moves @curr-game) b dir false))) ;performance cheating again!
+   ((:team-moves @curr-game) b dir false false))) ;performance cheating again!
 
 (defn go [^long dir b ^long d scorer]
 (let [successors (into [] (:children (game-tree dir b next-level)))]

@@ -42,7 +42,8 @@
  (getPoint [this]) ;for gui?
  (die [this])
  (promote [this np])
- (getMoves [this board with-precious-piece?])) 
+ (getMoves [this board with-precious-piece?] 
+           [this board with-precious-piece? lazy?])) 
  
  (defprotocol Movable 
  "The Command design pattern in action (allows us to do/undo moves)."
@@ -168,10 +169,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  
 (definline team-moves 
 "Returns all the moves (a reducer) for the team with direction 'dir' on this board b." 
-[b dir exposes-check?]
+[b dir exposes-check? lazy?]
 `(r/mapcat  
    (fn [p#] 
-     (getMoves p# ~b ~exposes-check?)) 
+     (getMoves p# ~b ~exposes-check? ~lazy?)) 
   (gather-team ~b ~dir)))
 
 
