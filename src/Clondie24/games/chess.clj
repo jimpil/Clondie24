@@ -347,8 +347,7 @@
 
 (defn tournament
 "Starts a tournament between the 2 players (p1, p2). If there is no winner, returns the entire history (vector) of 
- the tournament after 100 moves. If there is a winner, a 2d vector will be returned containing both the history(1st item) 
- and the winner (2nd item)." 
+ the tournament after 100 moves. If there is a winner, a map will be returned containing :history and the :winner." 
 [sb depth p1 p2 & {:keys [limit]
                    :or   {limit 100}}]
 (reduce 
@@ -382,8 +381,8 @@ otherwise returns the last board. Intended to be used with genetic training."
   
 (defn ga-fitness*
 "Scores p1 after competing with p2 starting with board b." 
-([b d fast? p1 p2]
-(let [winner ((if fast? fast-tournament tournament) b d p1 p2)]
+([b d p1 p2]
+(let [winner (fast-tournament b d p1 p2)]
 (condp = winner 
        (:direction p1)  1 ;reward p1 with 1 point
        (:direction p2) -2 ;penalise p1 with -2 points
@@ -391,7 +390,7 @@ otherwise returns the last board. Intended to be used with genetic training."
          
 
 (defn ga-fitness [] 
-(partial ga-fitness* (start-chess! false) (:pref-depth details) true)) 
+(partial ga-fitness* (core/starting-board details) (:pref-depth details))) 
 
 (defn ga 
 [brain pop-size & {:keys [randomizer to-mate to-mutate thread-no]

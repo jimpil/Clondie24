@@ -41,14 +41,37 @@
 
     
 (defn search "The recursion of the min-max algorithm." 
-[eval-fn tree depth]
+[eval-fn tree depth] 
 (letfn [(minimize  [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-min 
                                   (r/map (fn [child] (maximize (:tree child) (dec d))) (:children tree)))))
         (maximize  [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-max   
                                    (r/map (fn [child] (minimize (:tree child) (dec d))) (:children tree)))))] 
-(minimize tree (int depth))))    
+(minimize tree (int depth)))) 
+
+(def a (atom 100))
+(def b (atom -100))
+
+(defn search-ab "The recursion of the min-max algorithm + pruning." 
+[eval-fn tree depth a b] 
+(letfn [(minimize  [tree d ] (cond (zero? d) (let [ret (eval-fn (:root tree) (:direction tree))]
+                                                  (if (< ret  a) 
+                                                    (reset! a ret)
+                                                   ret))
+                                     ; (<= a b) nil
+                                 :else (if (<= a b) a
+                                   (r/reduce my-min 
+                                    (r/map (fn [child] (maximize (:tree child) (dec d) a b)) (:children tree))))))
+        (maximize  [tree d ] (cond (zero? d) (let [ret (eval-fn (:root tree) (:direction tree))]
+                                                  (if (> ret  b) 
+                                                    (reset! b ret)
+                                                   ret)) 
+                                    ; (<= a b) nil
+                                 :else (if (<= a b) b
+                                 (r/reduce my-max   
+                                   (r/map (fn [child] (minimize (:tree child) (dec d) a b)) (:children tree))))))] 
+(minimize tree (int depth) )))
     
 
 (defn evaluator
@@ -65,7 +88,7 @@
 (let [successors (into [] (:children (game-tree dir b next-level)))]
   (if (= 1 (count successors)) (first successors)   ;;mandatory move detected - just return it  
 (r/fold (:chunking @curr-game) best best ;2 = best so far
- (r/map #(Move-Value. (:move %) (search scorer (:tree %) (dec d))) ;starting from children so decrement depth
+ (r/map #(Move-Value. (:move %) (search-ab scorer (:tree %) (dec d))) ;starting from children so decrement depth
                     successors )))))
                          
                 
