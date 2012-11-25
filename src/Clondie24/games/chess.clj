@@ -51,17 +51,17 @@
 (def rel-values (zipmap '(:queen :rook :knight :bishop :pawn :king) 
                         '(  9      5     3       3       1    100)))
 
-(declare details, start-chess!, buffered-moves, castling-moves) ;;will need these
+(declare details, start-chess!, buffered-moves, castling-moves, en-passant-move) ;;will need these
 
 (definline chess-best-move [dir b n scorer] 
 `(s/go ~dir ~b ~n ~scorer))
 
 (defn chess-rand-move [dir b _ _] ;;need same arity as 'chess-best-move'
-(let [all-moves (into [] (core/team-moves b dir true false))]
+(let [all-moves (into [] (core/team-moves b dir true))]
 {:move (get all-moves (rand-int (count all-moves)))})) 
 
 (def current-chessItems
-"This is list that keeps track of moving checkers. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
+"This is list that keeps track of moving chess pieces. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
  (-> (atom nil)
    (add-watch  :log (partial core/log-board core/board-history))
    #_(add-watch  :last-move (fn [k r old n] (swap! r conj n)))))
@@ -88,6 +88,7 @@
 "Start a chess-game. Returns the starting-board."
  (core/clear-history!) ;empty board-history
     (deliver s/curr-game details)
+    (reset! core/board-history [])
     (reset! current-chessItems
   (if fast? (into-array  (core/starting-board details))
                          (core/starting-board details)))
@@ -102,8 +103,8 @@
      (:direction (first kings#))))) ;;return the direction of the king still standing 
      
 (definline gui-referee [b] ;referee a-la checkmate for the gui
-`(let [t1-moves# (into [] (core/team-moves ~b  1 true false))
-       t2-moves# (into [] (core/team-moves ~b -1 true false))]
+`(let [t1-moves# (into [] (core/team-moves ~b  1 true))
+       t2-moves# (into [] (core/team-moves ~b -1 true))]
  (cond 
     (empty? t1-moves#) "Yellow wins!"  
     (empty? t2-moves#) "Black wins!"   
@@ -125,29 +126,36 @@
  (promote [this np] (ChessPiece. #(get-in chess-images [:queen direction]) np 'queen 9 direction)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first position) (second position) board-mappings-chess))
  (getPoint [this] (ut/make-point position))
- (getMoves [this b with-precious?] (core/getMoves this b with-precious? true))
- (getMoves [this b with-precious? lazy?]
+ ;(getMoves [this b with-precious?] (core/getMoves this b with-precious? true))
+ (getMoves [this b with-precious?]
   (let [[x y] position
-        move-creator #(core/dest->Move b this % nil)
-        mapper (if lazy? map mapv)] 
+        move-creator #(core/dest->Move b this % nil)] 
     (core/remove-illegal #(or 
                              (core/collides? % 
                                (ut/make-walker 
                                  (ut/resolve-direction position  
-                                                       (let [ep (:end-pos %)] ;;the first move is what matters
+                                                       (let [ep (:end-pos %)] ;;the first move is what matters in multi-moves
                                                         (if (sequential? (first ep)) (first ep) ep))) 
                                  rank) b board-mappings-chess)
                             (core/exposes? % (when with-precious? 'king)))    
                   (case rank 
-                    pawn (->> ((:pawn chess-moves)  b x y direction)
-                            (mapper move-creator))
-                    king  (->> (get-in buffered-moves 
+                    pawn
+                    (if-let [en-pmv (en-passant-move b this)]
+                     (-> 
+                       (mapv move-creator ((:pawn chess-moves)  b x y direction))
+                        (conj en-pmv))
+                     (mapv move-creator ((:pawn chess-moves)  b x y direction)))
+                    king (into 
+                           (->> (get-in buffered-moves 
                                     [(core/translate-position x y board-mappings-chess) :king])
-                            (mapper move-creator)
-                            (into (castling-moves b this))) ;;casting is a move of the king's
+                            (mapv move-creator))
+                            (when-not (and with-precious? 
+                                           (some #(core/threatens? this % b) 
+                                            (core/gather-team b (- direction)))) 
+                                    (castling-moves b this))) ;;castling is a move of the king's
                           (->> (get-in buffered-moves
                                     [(core/translate-position x y board-mappings-chess) (keyword rank)])
-                             (mapper move-creator)))))) ;returns a lazy-seq of Move objects 
+                             (mapv move-creator))))))  
  Object
  (toString [this] 
    (println "Chess-item (" rank ") at position:" (core/getListPosition this) " ->" position)) )
@@ -220,13 +228,13 @@
                :north-player-start  (starting-chessItems true)   ;opponent (black)
                :south-player-start  (starting-chessItems false)});human (white or yellow)
 
-(defn castling-mover [board pawns new-positions]
+(defn castling-mover [board ps new-positions]
  (reduce-kv (fn [b piece coo]
              (let [newPiece (core/update-position piece coo) ;the new piece as a result of moving 
                    old-pos  (core/getListPosition piece)
                    new-pos  (core/getListPosition newPiece)]            
                    (assoc b old-pos nil 
-                            new-pos newPiece))) board (zipmap pawns new-positions)))
+                            new-pos newPiece))) board (zipmap ps new-positions)))
 
 (defn castling-moves [b king]
   (if  (:has-moved? (meta king)) nil ;;if king has moved, don't bother looking
@@ -245,12 +253,45 @@
              (nil? (get b (core/translate-position (- kx 3) ky core/mappings-8x8)))
              (not (:has-moved?  qrook)))
      (aset castlings 1 ;;a move with double-impact (the mover supplied must be able to hanle it)
-       (core/dest->Move b [king, qrook]  [[(- kx 2) ky], [(- kx 1) ky]] castling-mover))) ;;queenside castling-move
+       (core/dest->Move b [king, qrook]  [[(- kx 2) ky], [(dec kx) ky]] castling-mover))) ;;queenside castling-move
   (remove nil? castlings))))
-;(let [cas-moves (castling-moves ~b ~king)]
-;;(if-not cas-moves team-moves 
-;;  (concat team-moves cas-moves)))
-               
+
+(defn en-passant-mover [b p np]
+   (let [newPiece (core/update-position p np) ;the new piece as a result of moving 
+         old-pos  (core/getListPosition p)
+         new-pos  (core/getListPosition newPiece)
+         mov-dir  (ut/resolve-direction (:position p) np) 
+         en-passant-capture  (cond
+                               (or (= mov-dir :south-east) 
+                                   (= mov-dir :south-west)) (core/translate-position 
+                                                              (first np) (dec (second np)) core/mappings-8x8)
+                               (or (= mov-dir :north-east) 
+                                   (= mov-dir :north-west)) (core/translate-position
+                                                              (first np) (inc (second np)) core/mappings-8x8)
+                               :else (throw (IllegalStateException. "Wrong direction!!!")))]            
+                   (assoc b old-pos nil 
+                            new-pos newPiece
+                            en-passant-capture nil)))
+
+
+(defn en-passant-move [b pawn]
+  (when-let [last-move (:caused-by (meta b))]
+      (let [last-moving-piece (:p last-move)]  
+        
+  (when  (and 
+         (and (= 'pawn (:rank last-moving-piece))
+              (not= (:direction pawn) (:direction last-moving-piece)))
+         (= 1 (Math/abs ^long (- (first (:position pawn)) ;;side by side (x +/- 1)
+                                 (first (:end-pos last-move)))))
+         (= (second (:position pawn)) (second(:end-pos last-move))) ;;same y
+         (= 2 (Math/abs ^long (- (second (:position last-moving-piece)) 
+                                 (second (:end-pos last-move)))))) ;;previous pawn  jumped 2 squares
+         (core/dest->Move b pawn 
+                          (if (neg? (:direction pawn)) 
+                             [(first (:end-pos last-move)) 
+                              (dec (second (:end-pos last-move)))]
+                             [(first (:end-pos last-move)) 
+                              (inc (second (:end-pos last-move)))])  en-passant-mover)))))
                       
 (defmacro definvokable
   [type fields & deftype-tail]
@@ -273,7 +314,7 @@
 ;(definvokable brain )                                                           
 ;---------------------------------------------------------------------------------------------               
 
-(def buffered-moves 
+#_(def buffered-moves 
 "Precalculate the logical moves of chess-pieces for better performance. Does not apply to pawn."           
 (loop [k 0 m (hash-map)]
 (if (= 64 k) m
@@ -290,7 +331,7 @@
 ((if fields? norm/input identity) 
   (for [t b] 
   (if (nil? t) 0 
-   (* dir (:direction t) (:value t)))))) ;or maybe :direction instead of :value? 
+   (* dir (:direction t) (:value t)))))) 
   
 (definline neural-output "Creates output-field based on this InputField." 
 [inputs] 
@@ -314,13 +355,14 @@
  (fn [history player] 
   (let [cb (peek history) 
         win-dir (jit-referee cb)]
-    (if win-dir (reduced (vector history (if (= win-dir (:direction p1)) p1 p2)))
-    (conj history (->> player
+    (if win-dir (reduced {:history (persistent! history) 
+                          :winner (if (= win-dir (:direction p1)) p1 p2)})
+    (conj! history (->> player
                       :brain
                       ((:searcher player) (:direction player) cb depth) 
                       :move
                       core/try-move))))) 
- [sb] (take limit (cycle [p1 p2])))) ;;100 moves each should be enough
+ (transient [sb]) (take limit (cycle [p1 p2])))) ;;100 moves each should be enough
   
  
 (defn fast-tournament 
@@ -342,7 +384,7 @@ otherwise returns the last board. Intended to be used with genetic training."
 "Scores p1 after competing with p2 starting with board b." 
 ([b d fast? p1 p2]
 (let [winner ((if fast? fast-tournament tournament) b d p1 p2)]
-(condp #(= winner %)
+(condp = winner 
        (:direction p1)  1 ;reward p1 with 1 point
        (:direction p2) -2 ;penalise p1 with -2 points
 :else 0))))               ;give 0 points - noone won
@@ -369,7 +411,7 @@ otherwise returns the last board. Intended to be used with genetic training."
      (let [normals (anormalise (neural-input leaf dir false))
            output  (double-array 1)] 
      (.compute brain normals output)
-     (aget output 0)))
+     (aget ^doubles output 0)))
  dir chess-best-move)) 
      
 (defn random-player [dir]
@@ -378,7 +420,7 @@ otherwise returns the last board. Intended to be used with genetic training."
 (defn naive-player [dir]
 (Player. core/score-chess-naive dir chess-best-move))        
 
-(ut/data->string buffered-moves "machine-performance.cheat") 
+#_(ut/data->string buffered-moves "machine-performance.cheat") 
 (def buffered-moves (ut/string->data "machine-performance.cheat"))  ;it's faster to read them from file than recalculate       
 
 (defn -main 

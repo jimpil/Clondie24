@@ -42,8 +42,7 @@
  (getPoint [this]) ;for gui?
  (die [this])
  (promote [this np])
- (getMoves [this board with-precious-piece?] 
-           [this board with-precious-piece? lazy?])) 
+ (getMoves [this board with-precious-piece?])) 
  
  (defprotocol Movable 
  "The Command design pattern in action (allows us to do/undo moves)."
@@ -51,7 +50,7 @@
  (undo [this]) ;;optional in case you need mutation
  (getOrigin [this]))
  
-(defn translate
+(defn- translate
 "Translates a position from 1d to 2d and vice-versa. 
 Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'." 
 ([^long i mappings] ;{:post [(not (nil? %))]}   
@@ -103,8 +102,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 `(into [] (r/map #(if (alive? %) % nil) ~board)))         
 
 (defn move 
-"The function responsible for moving Pieces. Each piece knows where it can move. 
- Returns the resulting board without making any state changes. " 
+"A generic function for moving Pieces. Each piece knows where it can move. 
+ Returns the resulting board without side-effects. " 
 [board p coords] 
 ;{:pre [(satisfies? Piece p)]}  ;safety comes first
 ;(if  (some #{coords} (:mappings game-map)) ;check that the position exists on the grid
@@ -141,21 +140,29 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn dest->Move 
  "Constructor for creating moves from destinations. 
  It wouldn't make sense to pass more than 1 mover-fns." 
-[b p dest mover]  
+^Move [b p dest mover]  
 (if (nil? mover) (Move. p (partial move b) dest)
                  (Move. p (partial mover b) dest)))
 
 (defn execute! [^Move m batom]
  (reset! batom (try-move m)))
+
+(defn unchunk
+  "Returns a fully unchunked lazy sequence. Might need it for massive boards." 
+  [s] 
+  (when (seq s)
+    (lazy-seq
+      (cons (first s)
+            (unchunk (next s))))))
  
 (definline threatens? "Returns true if p2 is threatened by p1 on board b. This is the only time that we call getMoves with nil." 
 [p2 p1 b]
 `(some #{(:position ~p2)} 
-       (map :end-pos (getMoves ~p1 ~b false))))
+      (map :end-pos (getMoves ~p1 ~b false)))) 
 
 (defn undo! []
-(try (swap! board-history pop)
-(catch Exception e @board-history))) ;popping an empty stack throws an error (just return the empty one)    
+  (try (swap! board-history pop)
+  (catch Exception e @board-history))) ;popping an empty stack throws an error (just return the empty one)    
      
 
 (defn clear-history! []
@@ -169,10 +176,10 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  
 (definline team-moves 
 "Returns all the moves (a reducer) for the team with direction 'dir' on this board b." 
-[b dir exposes-check? lazy?]
+[b dir exposes-check?]
 `(r/mapcat  
    (fn [p#] 
-     (getMoves p# ~b ~exposes-check? ~lazy?)) 
+     (getMoves p# ~b ~exposes-check?)) 
   (gather-team ~b ~dir)))
 
 
@@ -197,7 +204,8 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
        [epx# epy# :as ep#]  (if multi-move?# (first ppp#) ppp#)
        dir# (if multi-move?# (get-in ~move [:p 0 :direction])
                              (get-in ~move [:p :direction]))]                                        
-(loop [[imm-px# imm-py# :as imm-p#] (if (nil? ~walker) ep# (~walker (getOrigin ~move)))] ;if walker is nil make one big step to the end       
+(loop [[imm-px# imm-py# :as imm-p#] (if (nil? ~walker) ep#  ;;if walker is nil make one big step to the end       
+                                        (~walker (getOrigin ~move)))]
 (cond  
   (=  imm-p# ep#) ;if reached destination there is potential for attack
        (if-not (= dir# (:direction (get ~b (translate-position epx# epy# ~m)))) false true)   
@@ -216,13 +224,13 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (definline exposes? [move precious]
 `(if-not ~precious false ;skip everything
    (let [next-b# (try-move ~move)
-         ipiece#  (first (:p ~move)) 
+         ipiece#  (first (:p ~move)) ;;assuming multi-move temporarily
          dir#     (if (map? ipiece#) (:direction ipiece#) 
                     (get-in ~move [:p :direction]))
          def-prec#  (some #(when (and (= ~precious (:rank %)) 
                                        (= dir# (:direction %))) %) next-b#)]
    (some #(threatens? def-prec# % next-b#) 
-     (gather-team next-b# (- dir#)))))) 
+      (gather-team next-b# (- dir#))))))
 
 
 (defn score-chess-naive ^double [b dir]
@@ -235,4 +243,21 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 `(into [] (r/remove ~pred ~ms)))
                  
 
-  
+ (defn aremove* [pred ^longs ms]
+ (let [aredu (areduce ms i ret (long-array (alength ms))
+               (let [v (aget ms i)]
+                 (when-not (pred v)
+                   (aset ret i v))  ret))]
+  (amap ^longs aredu idx res 
+    (let [v (aget ^longs aredu idx)]
+       (when-not (= v 0)) v)) )) 
+ ;(aremove neg? (long-array (range -200 500 50)))
+ 
+(defn aremove [pred ^"[LClondie24.lib.core.Move;" ns]
+ (remove #{0} 
+         (areduce ns i ret (long-array (alength ns))
+           (let [v (aget ns i)]
+             (when-not (pred v)
+               (aset ret i v))
+             ret))))  
+ 

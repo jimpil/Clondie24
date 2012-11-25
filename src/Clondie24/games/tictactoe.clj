@@ -85,6 +85,7 @@
 "Start a tic-tac-toe game. Returns the starting-board."
 (core/clear-history!) ;empty board-history
  (deliver s/curr-game details)
+  (reset! core/board-history [])
   (reset! current-tictactoeItems starting-board)) 
   
  (defn team-moves [b s _ _] 

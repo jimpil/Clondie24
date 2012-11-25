@@ -35,7 +35,7 @@
   (conde  
      [(= y 1) (= nil (get boa (try (translate-position x (+ y 2) m) (catch Exception e -1)))) 
       (== a x) (== b (+ y 2))] ;1st possibility (2 steps)
-     [(< (inc y) ymax) (= nil (get boa (try (translate-position x(inc y) m) (catch Exception e -1))))  
+     [(< (inc y) ymax) (= nil (get boa (try (translate-position x (inc y) m) (catch Exception e -1))))  
       (== a x) (== b (inc y))] ;2nd possibility (1 step)
      [(< (inc y) ymax) (< (inc x) xmax) (!= nil (get boa (try (translate-position (inc x) (inc y) m) (catch Exception e -1))))
       (!= dir (:direction (get boa (try (translate-position (inc x) (inc y) m) (catch Exception e -1))))) 

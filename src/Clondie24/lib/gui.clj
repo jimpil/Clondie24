@@ -155,7 +155,7 @@
  (when (and (not (nil? sel)) (or (:hint @knobs) 
                                   (:highlighting? @knobs))) 
  (let [pmvs (if-let [h (:hint @knobs)] (list (:move h)) ;expecting a hint?
-                (core/getMoves sel (peek @core/board-history) true false)) ;getMoves of selected piece
+                (core/getMoves sel (peek @core/board-history) true)) ;getMoves of selected piece
        balancer (ut/balance :up tile-size)]
    (doseq [m pmvs]
      (let [[x y :as end-pos] (:end-pos m)
@@ -298,6 +298,15 @@
 
 (definline alert! [s]
 `(ssw/alert ~s))
+
+(defn replay
+  "Replays a saved-game (history) on screen." 
+  [history]
+ ((:game-starter @curr-game) false)
+  (doseq [b history]
+    (reset! (:board-atom @curr-game) b)
+    (ssw/repaint! canvas)
+    (Thread/sleep 600))) 
 
 (defn resize! 
 "Handy macro for resizing the frame outside the gui when we don't have access to swing." 
