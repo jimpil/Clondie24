@@ -24,12 +24,18 @@
     best next))) ;(:move best) (:move rest)
 	                  
 (defn my-max 
-([x y] (max x y))
+([x y] (if (nil? x) y
+         (if (nil? y) x
+           (max x y))))
 ([]  Integer/MIN_VALUE))
    
 (defn my-min
-([x y] (min y x))
-([]  Integer/MAX_VALUE))             
+([x y] (if (nil? x) y
+         (if (nil? y) x
+           (min x y))))
+([]  Integer/MAX_VALUE)) 
+
+
 
  
 (defn game-tree "Generate the game tree."
@@ -40,38 +46,39 @@
              (successors-fn board dir))))
 
     
-(defn search "The recursion of the min-max algorithm." 
-[eval-fn tree depth] 
+(defn search-exhaustive "The recursion of the min-max algorithm." 
+[eval-fn tree] 
 (letfn [(minimize  [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-min 
                                   (r/map (fn [child] (maximize (:tree child) (dec d))) (:children tree)))))
         (maximize  [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-max   
                                    (r/map (fn [child] (minimize (:tree child) (dec d))) (:children tree)))))] 
-(minimize tree (int depth)))) 
+(minimize tree (-> (:pref-depth @curr-game)
+                   dec int))))
 
-(def a (atom 100))
-(def b (atom -100))
+(def search-mem (memoize #(search-exhaustive (:scorer @curr-game) %)))
 
-(defn search-ab "The recursion of the min-max algorithm + pruning." 
-[eval-fn tree depth a b] 
-(letfn [(minimize  [tree d ] (cond (zero? d) (let [ret (eval-fn (:root tree) (:direction tree))]
-                                                  (if (< ret  a) 
-                                                    (reset! a ret)
-                                                   ret))
-                                     ; (<= a b) nil
-                                 :else (if (<= a b) a
-                                   (r/reduce my-min 
-                                    (r/map (fn [child] (maximize (:tree child) (dec d) a b)) (:children tree))))))
-        (maximize  [tree d ] (cond (zero? d) (let [ret (eval-fn (:root tree) (:direction tree))]
-                                                  (if (> ret  b) 
-                                                    (reset! b ret)
-                                                   ret)) 
-                                    ; (<= a b) nil
-                                 :else (if (<= a b) b
-                                 (r/reduce my-max   
-                                   (r/map (fn [child] (minimize (:tree child) (dec d) a b)) (:children tree))))))] 
-(minimize tree (int depth) )))
+
+(defn search-ab "The recursion of the min-max algorithm with pruning." 
+[eval-fn tree] 
+(letfn [(minimize  [tree d a b] (if (zero? d) (do (println {:depth d :A @a :Β @b}) (eval-fn (:root tree) (:direction tree))) 
+                               (swap! a my-min 
+                                    (r/reduce my-min 
+                                       (r/map (fn [child] (if (<= @a @b)  (println {:depth d :A @a :Β @b})
+                                                            (maximize (:tree child) (dec d) a b))) (:children tree))))))
+        (maximize  [tree d a b] (if (zero? d) (do (println {:depth d :A @a :Β @b}) (eval-fn (:root tree) (:direction tree)))
+                               (swap! b  my-max                           
+                                  (r/reduce my-max   
+                                      (r/map (fn [child] (if (<= @a @b)  (println {:depth d :A @a :Β @b})
+                                                           (minimize (:tree child) (dec d) a b))) (:children tree))))))] 
+(minimize tree (dec (:pref-depth @curr-game)) (atom 1000) (atom -1000))))
+
+;(def search-ab-mem (memoize search-ab))
+
+(definline search [eval-fn tree pruning?]
+  `(if ~pruning? (search-ab ~eval-fn ~tree)
+                (search-exhaustive ~eval-fn ~tree)))
     
 
 (defn evaluator
@@ -84,11 +91,12 @@
  (r/map #(Move->Board. % (core/try-move %)) 
    ((:team-moves @curr-game) b dir false))) ;performance cheating again!
 
-(defn go [^long dir b ^long d scorer]
+(defn go [^long dir b pruning?]
 (let [successors (into [] (:children (game-tree dir b next-level)))]
   (if (= 1 (count successors)) (first successors)   ;;mandatory move detected - just return it  
 (r/fold (:chunking @curr-game) best best ;2 = best so far
- (r/map #(Move-Value. (:move %) (search-ab scorer (:tree %) (dec d))) ;starting from children so decrement depth
+ (r/map #(Move-Value. (:move %) (search (:scorer @curr-game) (:tree %) pruning?)) ;starting from children so decrement depth
                     successors )))))
+
                          
                 

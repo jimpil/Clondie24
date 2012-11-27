@@ -53,10 +53,15 @@
 
 (declare details, start-chess!, buffered-moves, castling-moves, en-passant-move) ;;will need these
 
-(definline chess-best-move [dir b n scorer] 
-`(s/go ~dir ~b ~n ~scorer))
+(definline valid-move? [m b] 
+ `(some #{~m} (core/getMoves (:p ~m) ~b false) )) 
 
-(defn chess-rand-move [dir b _ _] ;;need same arity as 'chess-best-move'
+(defn chess-best-move 
+ ([dir b] (chess-best-move dir b false))
+ ([dir b pruning?] (s/go dir b pruning?)))
+  
+
+(defn chess-rand-move [dir b _] ;;need same arity as 'chess-best-move'
 (let [all-moves (into [] (core/team-moves b dir true))]
 {:move (get all-moves (rand-int (count all-moves)))})) 
 
@@ -82,17 +87,18 @@
 ((r chess-moves) x y))) ;will return a fn which is called with current x and y 
 ;(if (= (class p) (Class/forName "Clondie24.games.chess.ChessPiece2"))
 ;(ut/Point->Vec pos) pos))))  
-                                              
+                         
 
-(defn start-chess! [fast?] 
-"Start a chess-game. Returns the starting-board."
- (core/clear-history!) ;empty board-history
-    (deliver s/curr-game details)
-    (reset! core/board-history [])
-    (reset! current-chessItems
-  (if fast? (into-array  (core/starting-board details))
-                         (core/starting-board details)))
-  );mandatory before game starts 
+(defn start-chess! ;mandatory before GUI game starts 
+"Start a proper chess-game (with history, searching and GUI capabilities). 
+ Returns the starting-board, a vector by default (no args), or optionally a Java array."
+  ([] (start-chess! false))
+  ([fast?] 
+    (core/clear-history!) ;clear board-history first
+    (deliver s/curr-game details) ;;hook on to tree-searching
+    (reset! current-chessItems ;;duh!
+       (if fast? (into-array  (core/starting-board details))
+                              (core/starting-board details)))))
     
 (definline jit-referee ;just-in-time referee
 "Inspects the board for missing kings. If no team is missing its king returns nil (no winner),
@@ -218,8 +224,9 @@
                :mover core/move
                :referee-gui gui-referee
                :referee-jit jit-referee
+               :scorer core/score-chess-naive ;;don't have any other scorers
                :naive-scorer core/score-chess-naive
-               :pref-depth 4
+               :pref-depth 6
                :board-atom current-chessItems
                :game-starter start-chess!
                :hinter chess-best-move 
@@ -348,7 +355,7 @@
 (defn tournament
 "Starts a tournament between the 2 players (p1, p2). If there is no winner, returns the entire history (vector) of 
  the tournament after 100 moves. If there is a winner, a map will be returned containing :history and the :winner." 
-[sb depth p1 p2 & {:keys [limit]
+[sb p1 p2 & {:keys [limit]
                    :or   {limit 100}}]
 (reduce 
  (fn [history player] 
@@ -358,7 +365,7 @@
                           :winner (if (= win-dir (:direction p1)) p1 p2)})
     (conj! history (->> player
                       :brain
-                      ((:searcher player) (:direction player) cb depth) 
+                      ((:searcher player) (:direction player) cb) 
                       :move
                       core/try-move))))) 
  (transient [sb]) (take limit (cycle [p1 p2])))) ;;100 moves each should be enough
@@ -367,14 +374,14 @@
 (defn fast-tournament 
 "Same as tournament but without keeping history. If there is a winner, returns the winning direction
 otherwise returns the last board. Intended to be used with genetic training." 
-[sb d p1 p2 & {:keys [limit]
+[sb p1 p2 & {:keys [limit]
                :or   {limit 100}}]
 (reduce 
   (fn [board player]
     (if-let [win-dir (jit-referee board)] (reduced (if (= win-dir (:direction p1)) p1 p2))
     (->> player
           :brain
-          ((:searcher player) (:direction player) board d)
+          ((:searcher player) (:direction player) board)
           :move
            core/try-move))) 
  sb (take limit (cycle [p1 p2])))) ;;50 moves each should be enough

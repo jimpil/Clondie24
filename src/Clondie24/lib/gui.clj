@@ -250,10 +250,10 @@
               
                
 (defn hint "Ask the computer for a hint." 
-[depth] 
+[pruning?] 
  ((:hinter @curr-game) 
     (get-in @knobs [:selection :direction]) 
-    (peek @core/board-history) depth (:naive-scorer @curr-game)))
+    (peek @core/board-history) pruning?))
           
 
 (defn set-laf! "Set look and feel of the ui, provided its name as a string."  
