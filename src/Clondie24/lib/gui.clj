@@ -155,9 +155,9 @@
   (let [sel (:selection @knobs)
         tile-size (:tile-size @curr-game)]
  (when (and (not (nil? sel)) (or (:hint @knobs) 
-                                  (:highlighting? @knobs))) 
+                                 (:highlighting? @knobs))) 
  (let [pmvs (if-let [h (:hint @knobs)] (list (:move h)) ;expecting a hint?
-                (core/getMoves sel (peek @core/board-history) true)) ;getMoves of selected piece
+                (core/getMoves sel (peek @core/board-history) nil)) ;getMoves of selected piece
        balancer (ut/balance :up tile-size)]
    (doseq [m pmvs]
      (let [[x y :as end-pos] (:end-pos m)
