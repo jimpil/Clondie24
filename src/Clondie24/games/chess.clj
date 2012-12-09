@@ -61,9 +61,9 @@
  ([dir b pruning?] (s/go dir b pruning?)))
   
 
-(defn chess-rand-move [dir b _] ;;need same arity as 'chess-best-move'
+(defn chess-rand-move [dir b] ;;need same arity as 'chess-best-move'
 (let [all-moves (into [] (core/team-moves b dir true))]
-{:move (get all-moves (rand-int (count all-moves)))})) 
+{:move (rand-nth all-moves)})) 
 
 (def current-chessItems
 "This is list that keeps track of moving chess pieces. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
@@ -226,7 +226,7 @@
                :referee-jit jit-referee
                :scorer core/score-chess-naive ;;don't have any other scorers
                :naive-scorer core/score-chess-naive
-               :pref-depth 6
+               :pref-depth 4
                :board-atom current-chessItems
                :game-starter start-chess!
                :hinter chess-best-move 

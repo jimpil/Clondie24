@@ -11,6 +11,7 @@
 ;----------------------------------------------------------------------------------------------------------------------    
 (def brand-new {:selection nil
                 :highlighting? false
+                :pruning? false
                 :block? false 
                 :hint nil
                 :whose-turn "Yellow"})
@@ -144,7 +145,8 @@
       ps (remove nil? b) 
       balancer (ut/balance :up (:tile-size @curr-game))]
   (doseq [p ps]
-  (let [[bx by] (mapv balancer (if (vector? (:position p)) (:position p) (ut/Point->Vec (:position p))));the balanced coords
+  (let [[bx by] (mapv balancer (if (vector? (:position p)) (:position p) 
+                                 (ut/Point->Vec (:position p))));the balanced coords
          pic ((:image p))]  ;the actual picture
     (.drawImage g pic bx by nil)))))) ;finally call g.drawImage() 
      
@@ -233,18 +235,28 @@
                                                                            (do (refresh :highlighting? false 
                                                                                         :hint nil) 
                                                                                (undo!) (ssw/repaint! canvas))))]) [:fill-h 10] 
-                        (ssw/button :text "Clear" :listen [:action (fn [e] (when-not (:block? @knobs)
-                                                                           (do (refresh :highlighting? false 
-                                                                                        :hint nil) 
-                                                                               (clear!) (ssw/repaint! canvas))))]) [:fill-h 10]
-                        (ssw/button :text "Available Moves" :listen [:action (fn [e] (when-not (:block? @knobs) 
-                                                            (do (refresh :highlighting? true 
-                                                                         :hint nil) 
-                                                                (ssw/repaint! canvas))))]) [:fill-h 10]
-                        (ssw/button :text "Hint" :listen [:action (fn [e] (when-not (:block? @knobs)
+                        (ssw/button :text "Clear" 
+                                    :listen [:action 
+                                             (fn [e] (when-not (:block? @knobs)
+                                                      (do (refresh :highlighting? false 
+                                                                   :hint nil) 
+                                                               (clear!) (ssw/repaint! canvas))))]) [:fill-h 8]
+                        (ssw/button :text "Available Moves" 
+                                    :listen [:action (fn [e] 
+                                                       (when-not (:block? @knobs) 
+                                                           (do (refresh :highlighting? true 
+                                                                        :hint nil) 
+                                                                (ssw/repaint! canvas))))]) [:fill-h 8]
+                        (ssw/button :text "Hint" 
+                                    :listen [:action (fn [e] (when-not (:block? @knobs)
                                                       (knob! :highlighting? false) 
                                                         (with-busy-cursor canvas 
-                                                           :hint (hint (:pref-depth @curr-game)))))]) [:fill-h 10]])
+                                                           :hint (hint (:pruning? @knobs)))))]) [:fill-h 8]
+                       (ssw/radio    :text "Sport" 
+                                     :selected? false 
+                                     :listen [:action (fn [e] 
+                                                       (when-not (:block? @knobs)
+                                                        (knob! :pruning? (not (:pruning? @knobs)))))]) [:fill-h 5]]) 
                :center canvas
                :south  status-label)))
               
