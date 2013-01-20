@@ -5,9 +5,9 @@
               [Clondie24.lib.search :as s]
               ;[Clondie24.lib.rules :as rul]
               [Clondie24.lib.gui :as gui]
-              ;[enclog.nnets :as ai]
+              [enclog.nnets :as ai]
               ;[enclog.training :as evol]
-              ;[enclog.normalization :as norm] :verbose :reload
+              ;[enclog.normalization :as norm] 
               )
     #_(:import  [encog_java.customGA CustomNeuralGeneticAlgorithm 
                                    CustomGeneticScoreAdapter Referee])
@@ -169,7 +169,13 @@
     (do (gui/knob! :block? true) (gui/alert! (str win-shape " WON!")))))))))
 
 (defn random-player [shape]
-(Player. nil shape ttt-rand-move))            
+(Player. nil shape ttt-rand-move)) 
+
+(def brain (ai/network (ai/neural-pattern :feed-forward) 
+                        :activation :sigmoid
+                        :input 9 ;the entire board for input
+                        :output 1 ;the score
+                        :hidden [4])) ; 1 hidden layer
 
 #_(defn score-ttt-naive [s b]
  (if-let [w (winner b)] 
