@@ -8,6 +8,7 @@
 (def ^:const mappings-8x8
 "A vector of vectors. Outer vector represents the 64 (serial) positions chess-items can position themselves on. 
  Each inner vector represents the coordinates of that position on the 8x8 grid."
+;(mapv #(apply vector-of :int %)
 [[0 0] [1 0] [2 0] [3 0] [4 0] [5 0] [6 0] [7 0]
  [0 1] [1 1] [2 1] [3 1] [4 1] [5 1] [6 1] [7 1]
  [0 2] [1 2] [2 2] [3 2] [4 2] [5 2] [6 2] [7 2]
@@ -15,14 +16,16 @@
  [0 4] [1 4] [2 4] [3 4] [4 4] [5 4] [6 4] [7 4]
  [0 5] [1 5] [2 5] [3 5] [4 5] [5 5] [6 5] [7 5]
  [0 6] [1 6] [2 6] [3 6] [4 6] [5 6] [6 6] [7 6]
- [0 7] [1 7] [2 7] [3 7] [4 7] [5 7] [6 7] [7 7]])
+ [0 7] [1 7] [2 7] [3 7] [4 7] [5 7] [6 7] [7 7]]);)
+ 
  
  (def ^:const mappings-3x3
 "A vector of vectors. Outer vector represents the 9 (serial) positions tic-tac-toe-items can position themselves on. 
  Each inner vector represents the coordinates of that position on the 3x3 grid."
+ ;(mapv #(apply vector-of :int %)
  [[0 0] [1 0] [2 0]
   [0 1] [1 1] [2 1]
-  [0 2] [1 2] [2 2]])
+  [0 2] [1 2] [2 2]]);)
 
 (def board-history 
 "Log of the state of a game." 
@@ -42,7 +45,7 @@
  (getPoint [this]) ;for gui?
  (die [this])
  (promote [this np])
- (getMoves [this board with-precious-piece?])) 
+ (getMoves [this board with-precious-piece?] #_[this board with-precious-piece? lazy?])) 
  
  (defprotocol Movable 
  "The Command design pattern in action (allows us to do/undo moves)."
@@ -141,8 +144,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  "Constructor for creating moves from destinations. 
  It wouldn't make sense to pass more than 1 mover-fns." 
 ^Move [b p dest mover]  
-(if (nil? mover) (Move. p (partial move b) dest)
-                 (Move. p (partial mover b) dest)))
+ (Move. p (partial (or mover move) b) dest))
 
 (defn execute! [^Move m batom]
  (reset! batom (try-move m)))
@@ -242,22 +244,4 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (definline remove-illegal [pred ms]
 `(into [] (r/remove ~pred ~ms)))
                  
-
- (defn aremove* [pred ^longs ms]
- (let [aredu (areduce ms i ret (long-array (alength ms))
-               (let [v (aget ms i)]
-                 (when-not (pred v)
-                   (aset ret i v))  ret))]
-  (amap ^longs aredu idx res 
-    (let [v (aget ^longs aredu idx)]
-       (when-not (= v 0)) v)) )) 
- ;(aremove neg? (long-array (range -200 500 50)))
- 
-(defn aremove [pred ^"[LClondie24.lib.core.Move;" ns]
- (remove #{0} 
-         (areduce ns i ret (long-array (alength ns))
-           (let [v (aget ns i)]
-             (when-not (pred v)
-               (aset ret i v))
-             ret))))  
  
