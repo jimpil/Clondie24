@@ -17,11 +17,15 @@
 (defrecord Move->Board [move board])
 (defrecord Move-Value  [move value])
 
-(defn best 
+(defn best-ttt 
 ([]    nil)
 ([best next] (max-key :value best next)))
-  #_(if (pos? (compare (:value best) (:value next))) 
-    best next) 
+    
+(defn best 
+([]   nil)
+([best next] 
+  (if (pos? (compare (:value best) (:value next))) 
+    best next)))   
 	                  
 (defn my-max 
 ([x y] (if (nil? x) y
