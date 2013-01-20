@@ -6,25 +6,21 @@
               [Clondie24.lib.gui :as gui]
               [enclog.nnets :as ai]
               [enclog.training :as evol]
-              [enclog.normalization :as norm] :verbose :reload)
+              [enclog.normalization :as norm])
     (:import  [encog_java.customGA CustomNeuralGeneticAlgorithm 
-                                   CustomGeneticScoreAdapter Referee]
+                                   CustomGeneticScoreAdapter Referee] 
               #_[Clondie24.lib.core Move])
 )
 
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
 
-(def board-mappings-chess core/mappings-8x8)
-#_(def state-dependent-moves (atom {:castling nil 
-                                  :en-passant nil})) 
-
+(def board-mappings-chess core/mappings-8x8) 
 (def chess-board-colours [(ut/hex->color '0xffdead) ;funny colour name!
                           (ut/hsb->color 0.931 0.863 0.545)])
 
 (defrecord Player [brain ^int direction searcher])
                                  
-
 (def chess-images "All the chess images paired up according to rank."
 (zipmap '(:queen :rook :knight :bishop :pawn :king)
                      [{-1 (ut/make-image "images/50px/png/Yellow Q.png")
@@ -129,14 +125,15 @@
                                 (ChessPiece. image np rank value direction {:alive true 
                                                                             :has-moved? true} nil)))
  (die [this]     (vary-meta this assoc :alive false)) ;communicate death through meta-data 
- (promote [this np] (ChessPiece. #(get-in chess-images [:queen direction]) np 'queen 9 direction)) ;a pawn is promoted to a queen
+ (promote [this np] (ChessPiece. #(get-in chess-images [:queen direction]) np 'queen 9 direction {:alive true 
+                                                                                                  :has-moved? true} nil)) ;a pawn is promoted to a queen
  (getListPosition [this] (core/translate-position (first position) (second position) board-mappings-chess))
  (getPoint [this] (ut/make-point position))
  ;(getMoves [this b with-precious?] (core/getMoves this b with-precious? true))
  (getMoves [this b with-precious?]
   (let [[x y] position
         move-creator #(core/dest->Move b this % nil)] 
-    (core/remove-illegal #(or 
+       (core/remove-illegal #(or 
                              (core/collides? % 
                                (ut/make-walker 
                                  (ut/resolve-direction position  
@@ -167,7 +164,7 @@
    (println "Chess-item (" rank ") at position:" (core/getListPosition this) " ->" position)) )
    
 #_(defrecord ChessPiece2 [^java.awt.Image image 
-                        ^java.awt.Point position 
+                          ^java.awt.Point position 
                          rank ^long value direction]
  core/Piece 
  (update-position [this np] (do (set! (.x position) (first np)) 
@@ -188,7 +185,8 @@
    (println "ChessItem (" rank ") at position:" (core/getListPosition this) " = " position)) )   
    
 (defn starting-chessItems
-"Will construct a set of initial chess items (16). black? specifies the side of the board where the pieces should be placed (true for north false for south)."
+"Will construct a set of initial chess items (16). 
+black? specifies the side of the board where the pieces should be placed (true for north false for south)."
 [black?]         
 (if black?  
 (map #(ChessPiece. (fn [] (get-in chess-images [(keyword %2) 1]))
@@ -253,12 +251,12 @@
        (:has-moved? (meta king)) nil
         (and (nil? (get b (core/translate-position (inc kx) ky core/mappings-8x8)))
              (nil? (get b (core/translate-position (+ 2 kx) ky core/mappings-8x8)))
-             (not (:has-moved?  krook)))
-      (aset castlings 0 (core/dest->Move b [king, krook]  [[(+ 2 kx) ky], [(+ 1 kx) ky]] castling-mover)) ;;kingside castling-move (2 moves)
+             (not (:has-moved? (meta krook))))
+      (aset castlings 0 (core/dest->Move b [king, krook]  [[(+ 2 kx) ky], [(inc kx) ky]] castling-mover)) ;;kingside castling-move (2 moves)
         (and (nil? (get b (core/translate-position (dec kx) ky core/mappings-8x8)))
              (nil? (get b (core/translate-position (- kx 2) ky core/mappings-8x8)))
              (nil? (get b (core/translate-position (- kx 3) ky core/mappings-8x8)))
-             (not (:has-moved?  qrook)))
+             (not (:has-moved?  (meta qrook))))
      (aset castlings 1 ;;a move with double-impact (the mover supplied must be able to hanle it)
        (core/dest->Move b [king, qrook]  [[(- kx 2) ky], [(dec kx) ky]] castling-mover))) ;;queenside castling-move
   (remove nil? castlings))))
@@ -300,7 +298,7 @@
                              [(first (:end-pos last-move)) 
                               (inc (second (:end-pos last-move)))])  en-passant-mover)))))
                       
-(defmacro definvokable
+#_(defmacro definvokable
   [type fields & deftype-tail]
   (let [f        (fields 0)
         args     (repeatedly 20 gensym)
@@ -397,7 +395,18 @@ otherwise returns the last board. Intended to be used with genetic training."
          
 
 (defn ga-fitness [] 
-(partial ga-fitness* (core/starting-board details) (:pref-depth details))) 
+(partial ga-fitness* (core/starting-board details) (:pref-depth details)))
+
+(comment 
+(def Referee2 
+(reify org.encog.neural.networks.training.CalculateScore
+(calculateScore [organism]
+(let [rand-org (fn [population ()])
+      compete-fn (fn compete [contestant] (if-not (identical? contestant (rand-org))))] 
+  (reduce + 
+    (for [i (range 5)] ())) )
+(shouldMinimize [] false))))
+) 
 
 (defn ga 
 [brain pop-size & {:keys [randomizer to-mate to-mutate thread-no]
@@ -445,8 +454,5 @@ otherwise returns the last board. Intended to be used with genetic training."
 )
 
 
-
-
-
-         
+      
                
