@@ -64,18 +64,20 @@
 (def minmax-TT (memoize #(minmax (:scorer @curr-game) %)))
 
 
+
+
 (defn alpha-beta "The recursion of the min-max algorithm with pruning." 
 [eval-fn tree] 
-(letfn [(minimize  [tree d a b] (if (zero? d) (eval-fn (:root tree) (:direction tree)) 
-                               (swap! a my-min 
+(letfn [(minimize  [tree d a b] (if (zero? d) (swap! b my-max (eval-fn (:root tree) (:direction tree))) 
+                                 (swap! a my-min 
                                     (r/reduce my-min 
-                                       (r/map (fn [child] (if-not (> @a @b) @b #_(println {:depth d :A @a :Β @b})
-                                                            (maximize (:tree child) (dec d) a b))) (:children tree))))))
-        (maximize  [tree d a b] (if (zero? d) (eval-fn (:root tree) (:direction tree))
-                               (swap! b  my-max                           
-                                  (r/reduce my-max   
-                                      (r/map (fn [child] (if-not (> @a @b)  @a #_(println {:depth d :A @a :Β @b})
-                                                           (minimize (:tree child) (dec d) a b))) (:children tree))))))] 
+                                       (r/map (fn [child] (if-not (> @a @b) (do (println {:depth d :A @a :Β @b}) nil)
+  							   (maximize (:tree child) (dec d) a b))) (:children tree))))))
+        (maximize  [tree d a b] (if (zero? d) (swap! a my-min (eval-fn (:root tree) (:direction tree)))
+                                 (swap! b my-max                       
+                                    (r/reduce my-max   
+                                       (r/map (fn [child] (if-not (> @a @b) (do (println {:depth d :A @a :Β @b})  nil)
+                                                        (minimize (:tree child) (dec d) a b))) (:children tree))))))] 
 (minimize tree (dec (:pref-depth @curr-game)) (atom 1000) (atom -1000))))
 
 (def alpha-beta-TT (memoize alpha-beta))
