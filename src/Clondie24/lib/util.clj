@@ -247,7 +247,17 @@
    (and (zero? dx#) (pos? dy#))  :south
    (and (zero? dx#) (neg? dy#))  :north
    (and (neg? dx#)  (neg? dy#))  :north-west
-   (and (neg? dx#)  (pos? dy#))  :south-west)))  
+   (and (neg? dx#)  (pos? dy#))  :south-west))) 
+
+(defn neighbours 
+"Returns all the neighbouring positions on an 8x8 board."
+ [[x y]]
+(let [in-board? #(and (>= % 0) (< % 8))]  
+(for [dx [-1 0 1] 
+      dy [-1 0 1] :let [new-pos [(+ dx x) (+ dy y)]]
+                  :when (and (not= 0 dx dy)  
+                             (every? in-board? new-pos))] 
+  new-pos)))    
    
         
     
