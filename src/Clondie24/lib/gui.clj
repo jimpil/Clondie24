@@ -212,7 +212,7 @@
     :paint draw-tiles
     :id :canvas
     :listen [:mouse-clicked (fn [e] (when-not (and (:block? @knobs) 
-                                                     (realized? curr-game)) 
+                                                    (realized? curr-game)) 
                                               (canva-react e)))]
     ;:background "#222222"; no need for background anymore
     ))
