@@ -5,10 +5,10 @@
 ;----------------------------------------<CODE>----------------------------------------------------------------------   
 (set! *unchecked-math* true)
 
-(def ^:const mappings-8x8
+(def mappings-8x8
 "A vector of vectors. Outer vector represents the 64 (serial) positions chess-items can position themselves on. 
  Each inner vector represents the coordinates of that position on the 8x8 grid."
-;(mapv #(apply vector-of :int %)
+(mapv #(apply vector-of :int %)
 [[0 0] [1 0] [2 0] [3 0] [4 0] [5 0] [6 0] [7 0]
  [0 1] [1 1] [2 1] [3 1] [4 1] [5 1] [6 1] [7 1]
  [0 2] [1 2] [2 2] [3 2] [4 2] [5 2] [6 2] [7 2]
@@ -16,16 +16,16 @@
  [0 4] [1 4] [2 4] [3 4] [4 4] [5 4] [6 4] [7 4]
  [0 5] [1 5] [2 5] [3 5] [4 5] [5 5] [6 5] [7 5]
  [0 6] [1 6] [2 6] [3 6] [4 6] [5 6] [6 6] [7 6]
- [0 7] [1 7] [2 7] [3 7] [4 7] [5 7] [6 7] [7 7]]);)
+ [0 7] [1 7] [2 7] [3 7] [4 7] [5 7] [6 7] [7 7]]))
  
  
  (def ^:const mappings-3x3
 "A vector of vectors. Outer vector represents the 9 (serial) positions tic-tac-toe-items can position themselves on. 
  Each inner vector represents the coordinates of that position on the 3x3 grid."
- ;(mapv #(apply vector-of :int %)
+(mapv #(apply vector-of :int %)
  [[0 0] [1 0] [2 0]
   [0 1] [1 1] [2 1]
-  [0 2] [1 2] [2 2]]);)
+  [0 2] [1 2] [2 2]]))
 
 (def board-history 
 "Log of the state of a game." 
@@ -157,7 +157,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
       (cons (first s)
             (unchunk (next s))))))
  
-(definline threatens? "Returns true if p2 is threatened by p1 on board b. This is the only time that we call getMoves with nil." 
+(definline threatens? "Returns true if p2 is threatened by p1 on board b. This is the only time that we call getMoves with a falsey last arg." 
 [p2 p1 b]
 `(some #{(:position ~p2)} 
       (map :end-pos (getMoves ~p1 ~b false)))) 
@@ -174,6 +174,13 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 [b dir]
 `(filter
    #(= ~dir (:direction %)) ~b)) ;all the team-mates (with same direction)
+   
+#_(definline gather-team [d dir]
+`(let [team# (transient (vector))]
+ (doseq [p# ~b]
+  (when (= ~dir (:direction p#))
+    (conj! team# p#)))
+(persistent! team#)))   
 
  
 (definline team-moves 
@@ -183,6 +190,13 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
    (fn [p#] 
      (getMoves p# ~b ~exposes-check?)) 
   (gather-team ~b ~dir)))
+  
+#_(defn my-filter [pred coll]
+(let [res (transient [])]
+   (doseq [p coll]
+   (when (pred p) 
+   (conj! res p))) 
+  (persistent! res)))  
 
 
 (defn vacant? 
