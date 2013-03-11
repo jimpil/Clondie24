@@ -39,7 +39,17 @@
            (min x y))))
 ([]  Integer/MAX_VALUE)) 
 
-
+(defn my-maxx 
+([x y] (if (nil? x) y
+         (if (nil? y) x
+           (max x y))))
+([]  Integer/MIN_VALUE))
+   
+(defn my-minn
+([x y a b] (if (nil? x) y
+         (if (nil? y) x
+           (min x y))))
+([]  Integer/MAX_VALUE)) 
 
  
 (defn game-tree "Generate the game tree."
@@ -61,30 +71,34 @@
 (minimize tree (-> (:pref-depth @curr-game)
                    dec int))))
 
-(def minmax-TT (memoize #(minmax (:scorer @curr-game) %)))
+(def minmax-TT (memoize #(minmax (:scorer @curr-game) %)));;transposition tables
 
 
 
 
 (defn alpha-beta "The recursion of the min-max algorithm with pruning." 
 [eval-fn tree] 
-(letfn [(minimize  [tree d a b] (if (zero? d) (swap! b my-max (eval-fn (:root tree) (:direction tree))) 
-                                 (swap! a my-min 
-                                    (r/reduce my-min 
-                                       (r/map (fn [child] (if-not (> @a @b) (do (println {:depth d :A @a :Β @b}) nil)
-  							   (maximize (:tree child) (dec d) a b))) (:children tree))))))
-        (maximize  [tree d a b] (if (zero? d) (swap! a my-min (eval-fn (:root tree) (:direction tree)))
-                                 (swap! b my-max                       
-                                    (r/reduce my-max   
-                                       (r/map (fn [child] (if-not (> @a @b) (do (println {:depth d :A @a :Β @b})  nil)
-                                                        (minimize (:tree child) (dec d) a b))) (:children tree))))))] 
+(letfn [(minimize  [tree d a b] (if (zero? d) (let [res (eval-fn (:root tree) (:direction tree))]
+                                                (do (swap! b my-max res) res))
+(let [ret (r/reduce (fn ([x y] (if (< @a @b) (do #_(println {:Depth d :A @a :B @b}) (reduced @a)) (my-min x y))) 
+                        ([] (my-min))) 
+                                       (r/map (fn [child] (maximize (:tree child) (dec d) a b)) (:children tree)))]                       
+                            (swap! a my-min ret) )))
+        (maximize  [tree d a b] (if (zero? d) (let [res (eval-fn (:root tree) (:direction tree))]
+                                                (do (swap! a my-min res) res))
+(let [ret (r/reduce (fn ([x y] (if (< @a @b) (do #_(println {:Depth d :A @a :B @b}) (reduced @b)) (my-max x y))) 
+                        ([] (my-max))) 
+                                       (r/map (fn [child] (minimize (:tree child) (dec d) a b)) (:children tree)))]                       
+                            (swap! b my-max ret) )))] 
 (minimize tree (dec (:pref-depth @curr-game)) (atom 1000) (atom -1000))))
 
-(def alpha-beta-TT (memoize alpha-beta))
+(def alpha-beta-TT (memoize alpha-beta));;transposition tables
 
 (defn search* [eval-fn tree pruning?]
   (if pruning? (alpha-beta eval-fn tree)
                (minmax eval-fn tree)))
+
+
     
 
 #_(defn evaluator
