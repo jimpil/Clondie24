@@ -265,18 +265,18 @@ black? specifies the side of the board where the pieces should be placed (true f
    (let [newPiece (core/update-position p np) ;the new piece as a result of moving 
          old-pos  (core/getListPosition p)
          new-pos  (core/getListPosition newPiece)
-         mov-dir  (ut/resolve-direction (:position p) np) 
-         en-passant-capture  (cond
-                               (or (= mov-dir :south-east) 
-                                   (= mov-dir :south-west)) (core/translate-position 
-                                                              (first np) (dec (second np)) core/mappings-8x8)
-                               (or (= mov-dir :north-east) 
-                                   (= mov-dir :north-west)) (core/translate-position
-                                                              (first np) (inc (second np)) core/mappings-8x8)
-                               :else (throw (IllegalStateException. "Wrong direction!!!")))]            
-                   (assoc b old-pos nil 
-                            new-pos newPiece
-                            en-passant-capture nil)))
+         mov-dir  (ut/resolve-direction (:position p) np)]
+      (when-let [en-passant-capture  (cond
+                                         (or (= mov-dir :south-east) 
+                                             (= mov-dir :south-west)) (core/translate-position 
+                                                                            (first np) (dec (second np)) core/mappings-8x8)
+                                        (or (= mov-dir :north-east) 
+                                            (= mov-dir :north-west)) (core/translate-position
+                                                                            (first np) (inc (second np)) core/mappings-8x8)
+                               :else nil)]
+      (assoc b old-pos nil 
+               new-pos newPiece
+               en-passant-capture nil))))
 
 
 (defn en-passant-move [b pawn]
