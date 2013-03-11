@@ -260,4 +260,9 @@
   new-pos)))    
    
         
-    
+(defn external-ip "Returns the external ip address of the machine this code is running on, as a string." 
+  ^String []
+(let [ip-url (java.net.URL. "http://api.exip.org/?call=ip")]
+(with-open [in (java.io.BufferedReader. 
+               (java.io.InputStreamReader. (.openStream ip-url)))]
+(.readLine in))))
