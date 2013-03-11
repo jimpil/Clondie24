@@ -1,8 +1,10 @@
 (ns Clondie24.lib.gui
     (:require [Clondie24.lib.util :as ut]
-              [Clondie24.lib.core :as core] 
+              [Clondie24.lib.core :as core]
+              [Clondie24.lib.srepl :as sre]
               [seesaw.core :as ssw]
-              [seesaw.chooser :as choo])
+              [seesaw.chooser :as choo] 
+              [org.dipert.swingrepl.main :as swrepl])
     (:import  [java.awt AlphaComposite Graphics Graphics2D Toolkit]
               [java.awt.event MouseEvent]
               [javax.swing SwingWorker UIManager]) )
@@ -83,7 +85,7 @@
       f-piece (get b l-pos)]
 (when-not (nil? f-piece) f-piece)))
 
-(declare canvas status-label hint)
+(declare canvas status-label hint show-repl!)
 
             
 (defn make-menubar 
@@ -109,18 +111,28 @@
                         :name "Load" 
                         :tip  "Load a game from disk." 
                         :key  "menu L")
-      a-quit (ssw/action :handler (fn [e] (System/exit 0)) 
-                        :name "Quit" 
-                        :tip  "Close arena" 
-                        :key  "menu Q")                  
+      a-quit (ssw/action :handler (fn [e] (when-let [repl-var (ns-resolve 'Clondie24.lib.gui 'Clondie24-nREPL)] 
+                                            (try (sre/stop (var-get repl-var)) 
+                                            (catch Exception e nil)) )
+                                          (System/exit 0)) 
+                         :name "Quit" 
+                         :tip  "Close arena" 
+                         :key  "menu Q")                  
       a-pref (ssw/action :handler (fn [e] (ssw/alert "Not implemented!")) 
-                        :name "Preferences" 
-                        :tip  "Show options" 
-                        :key  "menu O")
+                         :name "Preferences" 
+                         :tip  "Show options" 
+                         :key  "menu O")
       a-details (ssw/action :handler (fn [e] (ssw/alert "Not implemented!")) 
-                           :name "Details" 
-                           :tip  "Show info abou your PC."
-                           :key  "menu I")
+                            :name "Details" 
+                            :tip  "Show info abou your PC."
+                            :key  "menu I")
+      lo-repl (ssw/action   :handler (fn [e] (show-repl!)) 
+                            :name "REPL" 
+                            :tip  "Show a swing-based local REPL") 
+      re-repl (ssw/action   :handler (fn [e] (sre/defserver Clondie24-nREPL  8989 false) 
+                            (ssw/alert (str "nREPL server is up and running! Make a note of the following:\nI.P. = " (ut/external-ip) "\nPort = 8989\nName = Clondie24-nREPL")) )    
+                            :name "nREPL server" 
+                            :tip  "Start nREPL server that accepts remote clients.")
       a-bout    (ssw/action :handler (fn [e] (ssw/alert "Not implemented!")) 
                            :name "About" 
                            :tip  "A few words." 
@@ -128,6 +140,7 @@
 (ssw/menubar :items 
    [(ssw/menu :text "Game"    :items [a-new a-save a-load a-quit])
     (ssw/menu :text "Options" :items [a-pref])
+    (ssw/menu :text "Tools"   :items [lo-repl re-repl])
     (ssw/menu :text "Help"    :items [a-details a-bout])]) ))
 
 (defn draw-grid [c ^Graphics g]
@@ -177,8 +190,8 @@
  (draw-images g)
  (highlight-rects g)))
  
-(defmulti canva-react  (fn [_] (:name @curr-game))) ;ignore the argument
-(defmethod canva-react 'Chess [^MouseEvent e]
+(defmulti canva-react (fn [cg _] (:name cg))) ; (fn [_] (:name @curr-game))) ;ignore the argument  (fn [cg _] (:name cg))
+(defmethod canva-react 'Chess [_ ^MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e)) ;;(seesaw.mouse/location e)
       piece (identify-p (:mappings @curr-game) (peek @core/board-history) spot)
       sel   (:selection @knobs)
@@ -211,9 +224,9 @@
  (ssw/canvas
     :paint draw-tiles
     :id :canvas
-    :listen [:mouse-clicked (fn [e] (when-not (and (:block? @knobs) 
-                                                    (realized? curr-game)) 
-                                              (canva-react e)))]
+    :listen [:mouse-clicked (fn [^MouseEvent e] (when (and  (not (:block? @knobs)) 
+                                                            (realized? curr-game)) 
+                                                            ((partial canva-react @curr-game) e)))]
     ;:background "#222222"; no need for background anymore
     ))
 
@@ -275,7 +288,7 @@
  (UIManager/setLookAndFeel (.getClassName lf1))))
  
 
-(defmethod canva-react 'Checkers [^MouseEvent e]
+(defmethod canva-react 'Checkers [_ ^MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e)) ;;(seesaw.mouse/location e)
       board (peek @core/board-history)
       piece (identify-p (:mappings @curr-game) board spot)
@@ -334,4 +347,6 @@
      (doto (arena) ssw/show!)))
                                                 
                
-        
+(defn show-repl! "Pop up a local working REPL"
+ ([opt-map]  (swrepl/make-repl-jframe opt-map))
+ ([] (swrepl/make-repl-jframe)))        
