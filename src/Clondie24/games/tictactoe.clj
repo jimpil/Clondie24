@@ -152,7 +152,7 @@
                       core/try-move))))) 
  [sb] (take limit (cycle [p1 p2])))) ;;20 moves each should be enough
 
-(defmethod gui/canva-react 'Tic-Tac-Toe [^java.awt.event.MouseEvent e]
+(defmethod gui/canva-react 'Tic-Tac-Toe [_ ^java.awt.event.MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e))
       bspot (mapv (ut/balance :down (:tile-size details)) spot)]
 (when (core/vacant? board-mappings-tic-tac-toe @current-tictactoeItems bspot)
