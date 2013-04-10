@@ -1,5 +1,6 @@
 (ns Clondie24.lib.util
-    (:use [clojure.pprint :only (pprint, print-table)]))
+    (:require [clojure.pprint :refer [pprint, print-table]]
+              [clojure.edn :as edn]))
             
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
@@ -154,7 +155,7 @@
 [b fname]
 (with-open [oout (java.io.ObjectOutputStream. 
                   (java.io.FileOutputStream. fname))]
-                  (.writeObject oout b)))
+  (.writeObject oout b)))
                 
 (defn deserialize! 
 "Deserializes the object  in file f from the disk using standard Java serialization. 
@@ -175,11 +176,9 @@
   (binding [*out* w]  (prn b))))) 
 
 (defn string->data
-"Read the file f back on memory safely (no #=). Contents of f should be a clojure data-structure." 
+"Read the file f back on memory safely. Contents of f should be a clojure data-structure." 
 [f]
-(io! ;;throw if in transaction
- (binding [*read-eval* false]
- (read-string (slurp f)))))                            
+ (edn/read-string (slurp f)))                            
 
          
 (defn old-table-model 
@@ -233,6 +232,10 @@
 (defn make-walker [direction rank]
 (when-not (= rank 'knight) ;;knight jumps - doesn't walk
   #(walk direction %)))
+
+(defn within-limits? [[xlim ylim] [x y]]]
+ (and (>= x 0) (< x xlim)  
+      (>= y 0) (< y ylim)))
                    
           
 (definline resolve-direction 
@@ -249,18 +252,74 @@
    (and (neg? dx#)  (neg? dy#))  :north-west
    (and (neg? dx#)  (pos? dy#))  :south-west))) 
 
-(defn neighbours 
-"Returns all the neighbouring positions on an 8x8 board."
- [[x y]]
-(let [in-board? #(and (>= % 0) (< % 8))]  
-(for [dx [-1 0 1] 
-      dy [-1 0 1] :let [new-pos [(+ dx x) (+ dy y)]]
-                  :when (and (not= 0 dx dy)  
-                             (every? in-board? new-pos))] 
-  new-pos)))    
+(defn round-neighbours 
+"Returns all the neighbouring positions using the specified distance on a dimx*dimy board."
+([[x y] distance [dimx dimy]]
+  (let [in-board? (partial within-limits? [dimx dimy])]  
+    (for [dx (range (- distance) (inc distance))   
+          dy (range (- distance) (inc distance)) 
+            :let [new-pos [(+ dx x) (+ dy y)]]
+            :when (and (not= 0 dx dy)  
+                       (in-board? new-pos))] 
+  new-pos)))
+  ([[x y] distance] (round-neighbours [x y] distance [8 8]))
+  ([[x y]] (round-neighbours [x y] 1 [8 8])) )
+
+(defn horizontal-neighbours 
+  "Returns all the horizontally neighbouring positions using the specified distance on a dimx*dimy board."
+ ([[x y] distance [dimx dimy]]
+   (let [in-board? (partial within-limits? [dimx dimy])]
+     (for [dy (range (- distance) (inc distance))  
+        :let [tempy [x (+ dy y)]] ;x stays constant
+        :when (and (not= 0 dy) 
+                   (in-board? tempy))] tempy)))
+ ([[x y] distance] (horizontal-neighbours [x y] distance [8 8]))
+ ([[x y]] (horizontal-neighbours [x y] 1 [8 8])) )
+
+(defn vertical-neighbours 
+  "Returns all the vertically neighbouring positions using the specified distance on a dimx*dimy board."
+ ([[x y] distance [dimx dimy]]
+   (let [in-board? (partial within-limits? [dimx dimy])]
+     (for [dx (range (- distance) (inc distance))
+        :let [tempx [(+ dx x) y]] ;y stays constant
+        :when (and (not= 0 dx) 
+              (in-board? tempx))] tempx)))
+ ([[x y] distance] (vertical-neighbours [x y] distance [8 8]))
+ ([[x y]] (vertical-neighbours [x y] 1 [8 8])) )
+
+(defn diagonal-neighbours 
+  "Returns all the diagonnally neighbouring positions using the specified distance on a dimx*dimy board."
+ ([[x y] distance [dimx dimy]]
+   (let [in-board? (partial within-limits? [dimx dimy])]
+     (for [dx (range (- distance) (inc distance))
+           dy (range (- distance) (inc distance)) 
+        :let [[nx ny :as new-pos] [(+ dx x) (+ dy y)]]
+        :when (and (not= 0 dx dy)
+                   (in-board? new-pos)
+                    (=  (Math/abs ^long (- x nx))
+                        (Math/abs ^long (- y ny))))]
+     new-pos)))
+ ([[x y] distance] (diagonal-neighbours [x y] distance [8 8]))
+ ([[x y]] (diagonal-neighbours [x y] 1 [8 8])) )  
+
+(defn rook-moves
+[[x y :as pos]]]
+  (concat (vertical-neighbours pos 7) 
+          (horizontal-neighbours pos 7)))
+
+(defn bishop-moves  [[x y :as pos]]
+ (diagonal-neighbours pos 7))
+  
+(defn queen-moves [[x y :as pos]]
+ (concat (bishop-moves pos)  
+         (rook-moves   pos)))
+
+(defn king-moves [[x y :as pos]]
+  (round-neighbours 7))            
    
         
-(defn external-ip "Returns the external ip address of the machine this code is running on, as a string." 
+(defn external-ip 
+  "Returns the external ip address of the machine this code is running on, as a string." 
   ^String []
 (let [ip-url (java.net.URL. "http://api.exip.org/?call=ip")]
 (with-open [in (java.io.BufferedReader. 
