@@ -226,7 +226,7 @@
     :id :canvas
     :listen [:mouse-clicked (fn [^MouseEvent e] (when (and  (not (:block? @knobs)) 
                                                             (realized? curr-game)) 
-                                                            ((partial canva-react @curr-game) e)))]
+                                                      (canva-react @curr-game e)))]
     ;:background "#222222"; no need for background anymore
     ))
 
