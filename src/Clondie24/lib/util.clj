@@ -160,7 +160,7 @@
 (defn deserialize! 
 "Deserializes the object  in file f from the disk using standard Java serialization. 
  Filename needs no extension - it will be appended (.ser)." 
-^java.util.Collection [fname]
+ [fname]
 (with-local-vars [upb nil]  ;;waiting for the value shortly
   (with-open [oin (java.io.ObjectInputStream. 
                    (java.io.FileInputStream. fname))] 
