@@ -9,13 +9,13 @@
                  [org.clojure/core.match "0.2.0-alpha12"]
                  [org.clojure/tools.nrepl "0.2.2"] 
                  [seesaw "1.4.3"]
-                 [enclog "0.5.8"]
+                 [enclog "0.6.2"]
                  [swingrepl "1.3.0" :exclusions [org.clojure/clojure]] 
                  ]
   :dev-dependencies [[[midje "1.5-alpha2"]]]               
   ;:plugins [[lein-swank "1.4.4"]]             
-  :jvm-opts ["-Xmx2g" "-server" "-XX:-UseCompressedOops"] 
+  :jvm-opts ["-Xmx2g" "-server"] 
  ;:javac-options {:classpath "target/dependency/encog-core-3.1.0.jar" :destdir "target/classes"}
- ;:java-source-path "src/java"
- :main     Clondie24.games.chess             
+ :java-source-paths ["src/encog_java"]
+ ;:main     Clondie24.games.tictactoe             
  )
