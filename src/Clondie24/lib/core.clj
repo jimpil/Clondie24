@@ -1,6 +1,11 @@
 (ns Clondie24.lib.core
    (:require [Clondie24.lib.util :as ut]
-             [clojure.core.reducers :as r :only [map filter]]))
+             [clojure.core.reducers :as r]
+             [enclog.training :as evo]
+             [enclog.normalization :refer [prepare input output target-storage]]
+   )
+   (:import  [encog_java.customGA CustomNeuralGeneticAlgorithm Referee]
+             [org.encog.neural.networks BasicNetwork]))
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------   
 (set! *unchecked-math* true)
@@ -36,6 +41,8 @@
 [dest k r old n] 
  (when-not (= n old)  
   (swap! dest conj n)))
+  
+(defrecord Player [brain ^int direction searcher])  
 
 (defprotocol Piece "The Piece abstraction."
  (update-position [this new-position])
@@ -63,9 +70,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
     (throw (IllegalStateException. (str "NOT a valid list-location:" i))))))
 ([x y ^clojure.lang.PersistentVector mappings] ;{:post [(not= % -1)]} 
   (let [list-loc (.indexOf mappings [x y])] ;will translate from 2d to 1d
-    (if-not (= list-loc -1) ;not found 
-      list-loc 
-     (throw (IllegalStateException. (str "NOT a valid grid-location: [" x ", " y "]")))))))
+    (if (= list-loc -1) 
+     (throw (IllegalStateException. (str "NOT a valid grid-location: [" x ", " y "]"))) 
+     list-loc))))
 
 (def translate-position (memoize translate))
                     
@@ -175,13 +182,6 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 `(filter
    #(= ~dir (:direction %)) ~b)) ;all the team-mates (with same direction)
    
-#_(definline gather-team [d dir]
-`(let [team# (transient (vector))]
- (doseq [p# ~b]
-  (when (= ~dir (:direction p#))
-    (conj! team# p#)))
-(persistent! team#)))   
-
  
 (definline team-moves 
 "Returns all the moves (a reducer) for the team with direction 'dir' on this board b." 
@@ -190,13 +190,6 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
    (fn [p#] 
      (getMoves p# ~b ~exposes-check?)) 
   (gather-team ~b ~dir)))
-  
-#_(defn my-filter [pred coll]
-(let [res (transient [])]
-   (doseq [p coll]
-   (when (pred p) 
-   (conj! res p))) 
-  (persistent! res)))  
 
 
 (defn vacant? 
@@ -257,5 +250,64 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (definline remove-illegal [pred ms]
 `(into [] (r/remove ~pred ~ms)))
+
+;(comment
+
+(definline anormalise "Deals directly with seqs (input) and arrays (output)." 
+[ins]
+`(prepare nil nil :how :array-range :raw-seq ~ins))
+
+(defn normalize-fields [ins outs]
+ (prepare ins outs (target-storage :norm-array [64 nil])))
+
+(defn neural-input "Returns appropriate number of inputs for the neural-net according to how big the board is." 
+[b dir fields?]
+((if fields? input identity) 
+  (for [t b] 
+  (if (nil? t) 0 
+   (* dir (:direction t) (:value t)))))) 
+  
+(definline neural-output "Creates output-field based on this InputField." 
+[input] 
+`(output ~input))  
+
+(defn neural-player 
+"Constructs a Player object given a brain b (a neural-net), a direction dir and a game-specific tree-searching fn." 
+ [^BasicNetwork brain dir]
+(let [all-symbols (-> *ns* ns-publics keys)
+      symbol-strings  (map name all-symbols)
+      game-specific-searcher-fn (some #(when (re-matches #".*best-move" %) %) symbol-strings)]  
+(Player. 
+   (fn [leaf _] ;;ignore 2nd arg - we already have direction
+     (let [normals (anormalise (neural-input leaf dir false))
+           output  (double-array 1)] 
+     (.compute brain normals output)
+     (aget ^doubles output 0)))
+ dir (resolve (symbol game-specific-searcher-fn)))))
+ 
+(defn GA 
+[brain pop-size & {:keys [randomizer to-mate to-mutate thread-no]
+                   :or {randomizer (evo/randomizer :nguyen-widrow)
+                        to-mate   0.2
+                        to-mutate 0.1
+                        thread-no (+ 2 (.. Runtime getRuntime availableProcessors))}}]
+(doto 
+  (CustomNeuralGeneticAlgorithm. brain randomizer (Referee.) pop-size to-mate to-mutate)
+  (.setThreadCount thread-no)))
+  
+(defn ga-fitness
+"Scores p1 after competing with p2 starting with board b." 
+([b d p1 p2]
+(let [winner ((resolve 'fast-tournament) b d p1 p2)]
+(condp = winner 
+       (:direction p1)  1 ;reward p1 with 1 point
+       (:direction p2) -2 ;penalise p1 with -2 points
+      :else 0)))          ;give 0 points - noone won 
+([p1 p2]
+  (let [sns (symbol namespace)] 
+  (ga-fitness (resolve *ns* 'starting-board) 
+              (->> 'details (resolve *ns*) :pref-depth) p1 p2))) )   
+              
+                      
                  
  
