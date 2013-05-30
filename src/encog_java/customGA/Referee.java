@@ -18,17 +18,15 @@ import clojure.lang.Var;
  *network how well it is doing.
  * 
  * */
-public  class Referee implements CalculateScore 
+public final class Referee implements CalculateScore 
 {
         //prepare java-clojure interop
-        private static IFn requireFn = RT.var("clojure.core", "require").fn();
-        static {requireFn.invoke(Symbol.intern("Clondie24.games.chess"));}
-        private static IFn fitnessFn = RT.var("Clondie24.games.chess", "ga-fitness").fn();//the fn we need
-        private static IFn genPlayerFn = RT.var("Clondie24.games.chess", "generate-player").fn(); 
+        private static IFn requireFn =   RT.var("clojure.core", "require").fn();
+        static { requireFn.invoke(Symbol.intern("Clondie24.lib.core")); }
+        private static IFn fitnessFn =   RT.var("Clondie24.lib.core", "ga-fitness").fn();//the fn we need
+        private static IFn genPlayerFn = RT.var("Clondie24.lib.core", "neural-player").fn(); 
 	
 	private Population population;
-	
-	public Referee(){}
 
 	
 	@Override
@@ -42,7 +40,7 @@ public  class Referee implements CalculateScore
 	  double[] scores = new double[noGames];
 	  
 	 for (int i=0;i<noGames;i++) 
-	  scores[i] = compete(contestant);
+	   scores[i] = compete(contestant);
 	  
 	  return  fiveGameSum(scores);
 		
@@ -84,7 +82,7 @@ public  class Referee implements CalculateScore
 	}
 	
 	public Population getPopulation(){
-		return this.population;
+		return population;
 	}
 	
 	private Object generatePlayer(MLRegression brain, int direction){
