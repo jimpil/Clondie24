@@ -233,7 +233,7 @@
 (when-not (= rank 'knight) ;;knight jumps - doesn't walk
   #(walk direction %)))
 
-(defn within-limits? [[xlim ylim] [x y]]]
+(defn within-limits? [[xlim ylim] [x y]]
  (and (>= x 0) (< x xlim)  
       (>= y 0) (< y ylim)))
                    
@@ -302,26 +302,26 @@
  ([[x y] distance] (diagonal-neighbours [x y] distance [8 8]))
  ([[x y]] (diagonal-neighbours [x y] 1 [8 8])) )  
 
-(defn rook-moves
-[[x y :as pos]]]
+(defn rook-moves  [[x y :as pos]]
   (concat (vertical-neighbours pos 7) 
           (horizontal-neighbours pos 7)))
 
 (defn bishop-moves  [[x y :as pos]]
- (diagonal-neighbours pos 7))
+  (diagonal-neighbours pos 7))
   
 (defn queen-moves [[x y :as pos]]
- (concat (bishop-moves pos)  
-         (rook-moves   pos)))
+  (concat (bishop-moves pos)  
+          (rook-moves   pos)))
 
 (defn king-moves [[x y :as pos]]
   (round-neighbours 7))            
    
         
-(defn external-ip 
-  "Returns the external ip address of the machine this code is running on, as a string." 
-  ^String []
+(defn external-ip "Returns the external ip address of the machine this code is running on, as a string." 
+ ^String []
 (let [ip-url (java.net.URL. "http://api.exip.org/?call=ip")]
 (with-open [in (java.io.BufferedReader. 
                (java.io.InputStreamReader. (.openStream ip-url)))]
 (.readLine in))))
+
+
