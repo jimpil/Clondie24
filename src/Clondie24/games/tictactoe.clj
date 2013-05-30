@@ -1,16 +1,17 @@
 (ns Clondie24.games.tictactoe
-    (:use [clojure.core.match :only (match)]) 
+    (:use [clojure.core.match :only [match]]) 
     (:require [Clondie24.lib.util :as ut] 
               [Clondie24.lib.core :as core]
               [Clondie24.lib.search :as s]
-              ;[Clondie24.lib.rules :as rul]
               [Clondie24.lib.gui :as gui]
               [enclog.nnets :as ai]
-              ;[enclog.training :as evol]
+              ;[enclog.training :as evo]
               ;[enclog.normalization :as norm] 
               )
-    #_(:import  [encog_java.customGA CustomNeuralGeneticAlgorithm 
-                                   CustomGeneticScoreAdapter Referee])
+    (:import [Clondie24.lib.core Player] 
+             ;[encog_java.customGA CalculateScore CustomNeuralGeneticAlgorithm CustomGeneticScoreAdapter Referee ] 
+             ;[org.encog.ml MLRegression]
+   )
 )
 
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
@@ -22,7 +23,7 @@
 (def shape->dir {'X -1 'O 1}) ;;we use direction to represent shape
 (def dir->shape {-1 'X 1 'O})
 (def turns (atom (cycle ['X 'O])))
-(defrecord Player [brain shape searcher])
+;(defrecord Player [brain shape searcher])
 (declare details starting-board game-over? move)
 
 
@@ -37,20 +38,18 @@
 (defrecord TicTacToePiece [direction image position]
  core/Piece   
  (update-position [this np] (TicTacToePiece. direction image np)) 
- (die [this]    (throw (IllegalStateException. "Tic-tac-toe pieces cannot die!"))) 
+ (die [this]        (throw (IllegalStateException. "Tic-tac-toe pieces cannot die!"))) 
  (promote [this np] (throw (IllegalStateException. "Tic-tac-toe pieces cannot be promoted!"))) 
  (getListPosition [this] (core/translate-position (first position) (second position) board-mappings-tic-tac-toe))
- (getPoint [this] (ut/make-point position))
- #_(getMoves [this b _] (core/getMoves this b _ _))  
+ (getPoint [this] (ut/make-point position)) 
  (getMoves [this b _] 
    (when-not (game-over? b)  
     (->> (for [i (range (count b)) :let [t (get b i)] :when (nil? t)]  
           (core/translate-position i board-mappings-tic-tac-toe))
      (map #(core/dest->Move b this % move)) )))
-
  Object
  (toString [this] 
-   (println "TicTacToe (" (str (get dir->shape direction)) ") at position:" (core/getListPosition this) " ->" position)))            
+   (println (str (get dir->shape direction)" -> " position))) )          
                
 (defn move 
 "The function responsible for placing tic-tac-toe pieces. 
@@ -60,11 +59,10 @@
     (assoc board (core/getListPosition np) np))) 
        
     
-(defn full-board? [b]
- (not-any? nil? b))                 
+(definline full-board? [b]
+ `(not-any? nil? ~b))                 
 
-(defn match-win 
-"Returns the winning direction [1 , -1] or nil. " 
+(defn match-win "Returns the winning direction [1 , -1] or nil. " 
 [b]
 (for [[x y z :as rows] winning-sets]
      (match   (mapv #(get dir->shape (:direction (get b %))) rows) ;;[(:shape (get b x)) (:shape (get b y)) (:shape (get b z))]        
@@ -82,9 +80,8 @@
     :else nil)))
  
 (defn game-over? [b]
- (if (or (winner b)
-         (full-board? b)) 
- true false))
+  (or (winner b)
+      (full-board? b)))
  
 (defn start-tictactoe! [_] 
 "Start a tic-tac-toe game. Returns the starting-board."
@@ -94,10 +91,12 @@
  (deliver s/curr-game details)
   (reset! current-tictactoeItems starting-board)) 
   
- (defn team-moves [b d _ ]
-   (let [dummy (TicTacToePiece. d nil nil)] 
- (-> dummy
-     (core/getMoves b false)))) 
+(defn team-moves 
+([b d]
+  (let [dummy (TicTacToePiece. d nil nil)] 
+    (core/getMoves dummy b nil)))
+([b d _] ;;we need this in order to fit with the parallel minimax implementation
+  (team-moves b d)) )
                 
 (def details "The map that describes the game of tic-tac-toe."
               {:name 'Tic-Tac-Toe
@@ -107,9 +106,9 @@
                         'O (ut/make-image "images/133px/tic-tac-toe-O.png")}
                :characteristics [:direction :image :position]      
                :board-size 9
-               :arena-size [420 :by 505]
+               :arena-size [420 :by 530]
                :tiles (map vector (for [x (range 0 420 133) 
-                                        y (range 0 505 133)] [x y]) 
+                                        y (range 0 530 133)] [x y]) 
                                   (cycle nil)) ;;there are no colours 
                :tile-size 133
                :total-pieces 0
@@ -123,15 +122,14 @@
                :board-atom current-tictactoeItems
                :game-starter start-tictactoe!
                :hinter tic-tac-toe-best-move 
-               :record-name "Clondie24.games.tic-tac-toe.TicTacToePiece" ;;fully qualified name
+               :record-name "Clondie24.games.tictactoe.TicTacToePiece" ;;fully qualified name
                :mappings board-mappings-tic-tac-toe})
                 
-(def starting-board (core/empty-board details)) 
+(def starting-board "The empty starting board of tic-tac-toe." (core/empty-board details)) 
 
 (defn ttt-rand-move [direction b _ _] 
-  (let [p (TicTacToePiece. direction nil nil) 
-        all-moves (vec (core/getMoves p b nil))]
-    {:move (core/dest->Move b p (rand-nth all-moves) move)})) 
+  (let [p (TicTacToePiece. direction nil nil)]
+    {:move (rand-nth (core/getMoves p b nil))})) 
 
 (defn tournament
 "Starts a tournament between the 2 players (p1, p2). If there is no winner, returns the entire history (vector) of 
@@ -143,7 +141,7 @@
  (fn [history player] 
   (let [cb (peek history) 
         win-dir (winner cb)]
-    (if (game-over? cb) (reduced (vector history (when win-dir 
+    (if (full-board? cb) (reduced (vector history (when win-dir 
                                                    (if (= win-dir (:direction p1)) p1 p2))))
     (conj history (->> player
                       :brain
@@ -151,6 +149,23 @@
                       :move
                       core/try-move))))) 
  [sb] (take limit (cycle [p1 p2])))) ;;20 moves each should be enough
+ 
+(defn fast-tournament 
+"Same as tournament but without keeping history. If there is a winner, returns the winning direction
+otherwise returns the last board. Intended to be used with genetic training." 
+[sb p1 p2 & {:keys [limit]
+             :or   {limit 20}}]
+(reduce 
+  (fn [board player]
+   (let [win-dir (winner board)]
+    (if (full-board? board) (reduced (when win-dir 
+                                     (if (= win-dir (:direction p1)) p1 p2) ))
+    (->> player
+          :brain
+          ((:searcher player) (:direction player) board)
+          :move
+           core/try-move)))) 
+ sb (take limit (cycle [p1 p2])))) ;;100 moves should be enough 
 
 (defmethod gui/canva-react 'Tic-Tac-Toe [_ ^java.awt.event.MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e))
@@ -181,7 +196,8 @@
  (if-let [w (winner b)] 
     (if (= w s) 1 -1)
  0))
-;(tournament starting-board 9 (random-player 'X) (random-player 'O))               
+;(tournament starting-board 9 (random-player 'X) (random-player 'O))
+               
                
 (defn -main [& args]
 (gui/show-gui! details)

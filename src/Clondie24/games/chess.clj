@@ -5,11 +5,12 @@
               [Clondie24.lib.rules :as rul]
               [Clondie24.lib.gui :as gui]
               [enclog.nnets :as ai]
-              [enclog.training :as evol]
-              [enclog.normalization :as norm])
-    (:import  [encog_java.customGA CustomNeuralGeneticAlgorithm 
+              ;[enclog.training :as evo]
+              ;[enclog.normalization :as norm] 
+    )
+    (:import  #_[encog_java.customGA CustomNeuralGeneticAlgorithm 
                                    CustomGeneticScoreAdapter Referee] 
-              #_[Clondie24.lib.core Move])
+              [Clondie24.lib.core Player])
 )
 
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
@@ -19,7 +20,7 @@
 (def chess-board-colours [(ut/hex->color '0xffdead) ;funny colour name!
                           (ut/hsb->color 0.931 0.863 0.545)])
 
-(defrecord Player [brain ^int direction searcher])
+;(defrecord Player [brain ^int direction searcher])
                                  
 (def chess-images "All the chess images paired up according to rank."
 (zipmap '(:queen :rook :knight :bishop :pawn :king)
@@ -67,7 +68,7 @@
    (add-watch  :log (partial core/log-board core/board-history))
    #_(add-watch  :last-move (fn [k r old n] (swap! r conj n)))))
 
-(def chess-moves {:pawn     #(rul/pawn-moves board-mappings-chess % %2 %3 %4) 
+(def chess-moves {:pawn     #(rul/pawn-moves board-mappings-chess %1 %2 %3 %4) 
                   :rook      rul/rook-moves
                   :bishop    rul/bishop-moves
                   :knight    rul/knight-moves
@@ -209,11 +210,11 @@ black? specifies the side of the board where the pieces should be placed (true f
                :images chess-images
                :characteristics [:image :position :rank :value :direction]      
                :board-size 64
-               :arena-size [421 :by 506]
+               :arena-size [421 :by 530]
                :tile-size 50
                :alternating-colours chess-board-colours
                :tiles (mapv vector (for [x (range 0 421 50) 
-                                         y (range 0 506 50)] [x y]) 
+                                         y (range 0 530 50)] [x y]) 
                                    (cycle chess-board-colours))
                :total-pieces 32
                :rel-values rel-values
@@ -232,6 +233,8 @@ black? specifies the side of the board where the pieces should be placed (true f
                :mappings board-mappings-chess
                :north-player-start  (starting-chessItems true)   ;opponent (black)
                :south-player-start  (starting-chessItems false)});human (white or yellow)
+               
+(def starting-board "The empty starting board of chess." (core/empty-board details))                
 
 (defn castling-mover [board ps new-positions]
  (reduce-kv (fn [b piece coo]
@@ -331,30 +334,19 @@ black? specifies the side of the board where the pieces should be placed (true f
       ['rook 'knight 'bishop 'queen 'king])))))))
       
       
-(defn neural-input "Returns 64 inputs for the neural net." 
-[b dir fields?]
-((if fields? norm/input identity) 
-  (for [t b] 
-  (if (nil? t) 0 
-   (* dir (:direction t) (:value t)))))) 
-  
-(definline neural-output "Creates output-field based on this InputField." 
-[inputs] 
-`(norm/output ~inputs))
 
-(defn normalize-fields [ins outs]
+
+#_(defn normalize-fields [ins outs]
 ((norm/prepare :range [ins] [outs]) false 
   (norm/target-storage :norm-array [64 nil])))          
   
-(definline anormalise "Deals directly with seqs (input) and arrays (output)." 
-[ins]
-`(norm/prepare :array-range nil nil :raw-seq ~ins))  
+
 
 (defn tournament
 "Starts a tournament between the 2 players (p1, p2). If there is no winner, returns the entire history (vector) of 
  the tournament after 100 moves. If there is a winner, a map will be returned containing :history and the :winner." 
 [sb p1 p2 & {:keys [limit]
-                   :or   {limit 100}}]
+             :or   {limit 100}}]
 (reduce 
  (fn [history player] 
   (let [cb (peek history) 
@@ -366,14 +358,14 @@ black? specifies the side of the board where the pieces should be placed (true f
                       ((:searcher player) (:direction player) cb) 
                       :move
                       core/try-move))))) 
- (transient [sb]) (take limit (cycle [p1 p2])))) ;;100 moves each should be enough
+ (transient [sb]) (take limit (cycle [p1 p2])))) ;;100 moves should be enough
   
  
 (defn fast-tournament 
 "Same as tournament but without keeping history. If there is a winner, returns the winning direction
 otherwise returns the last board. Intended to be used with genetic training." 
 [sb p1 p2 & {:keys [limit]
-               :or   {limit 100}}]
+             :or   {limit 100}}]
 (reduce 
   (fn [board player]
     (if-let [win-dir (jit-referee board)] (reduced (if (= win-dir (:direction p1)) p1 p2))
@@ -382,55 +374,12 @@ otherwise returns the last board. Intended to be used with genetic training."
           ((:searcher player) (:direction player) board)
           :move
            core/try-move))) 
- sb (take limit (cycle [p1 p2])))) ;;50 moves each should be enough
+ sb (take limit (cycle [p1 p2])))) ;;100 moves should be enough
   
-(defn ga-fitness*
-"Scores p1 after competing with p2 starting with board b." 
-([b d p1 p2]
-(let [winner (fast-tournament b d p1 p2)]
-(condp = winner 
-       (:direction p1)  1 ;reward p1 with 1 point
-       (:direction p2) -2 ;penalise p1 with -2 points
-:else 0))))               ;give 0 points - noone won
-         
-
-(defn ga-fitness [] 
-(partial ga-fitness* (core/starting-board details) (:pref-depth details)))
-
-(comment 
-(def Referee2 
-(reify org.encog.neural.networks.training.CalculateScore
-(calculateScore [organism]
-(let [rand-org (fn [population ()])
-      compete-fn (fn compete [contestant] (if-not (identical? contestant (rand-org))))] 
-  (reduce + 
-    (for [i (range 5)] ())) )
-(shouldMinimize [] false))))
-) 
-
-(defn ga 
-[brain pop-size & {:keys [randomizer to-mate to-mutate thread-no]
-                   :or {randomizer (evol/randomizer :nguyen-widrow)
-                        to-mate   0.2
-                        to-mutate 0.1
-                        thread-no 10}}]
-(doto 
- (CustomNeuralGeneticAlgorithm. brain randomizer  (Referee.) pop-size to-mate to-mutate)
- (.setThreadCount thread-no)))
-
-(defn neural-player 
-"Constructs a Player object given a brain b (a neural-net) and a direction dir." 
- [^org.encog.neural.networks.BasicNetwork brain dir]
-(Player. 
-   (fn [leaf _] ;;ignore 2nd arg - we already have direction
-     (let [normals (anormalise (neural-input leaf dir false))
-           output  (double-array 1)] 
-     (.compute brain normals output)
-     (aget ^doubles output 0)))
- dir chess-best-move)) 
-     
+  
 (defn random-player [dir]
 (Player. nil dir chess-rand-move)) 
+
 
 (defn naive-player [dir]
 (Player. core/score-chess-naive dir chess-best-move))        
