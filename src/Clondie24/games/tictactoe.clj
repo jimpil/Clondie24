@@ -1,10 +1,10 @@
 (ns Clondie24.games.tictactoe
-    (:use [clojure.core.match :only [match]]) 
     (:require [Clondie24.lib.util :as ut] 
               [Clondie24.lib.core :as core]
               [Clondie24.lib.search :as s]
               [Clondie24.lib.gui :as gui]
               [enclog.nnets :as ai]
+              [clojure.core.match :refer [match]]
               ;[enclog.training :as evo]
               ;[enclog.normalization :as norm] 
               )
@@ -24,7 +24,7 @@
 (def dir->shape {-1 'X 1 'O})
 (def turns (atom (cycle ['X 'O])))
 ;(defrecord Player [brain shape searcher])
-(declare details starting-board game-over? move)
+(declare details starting-board game-over? move score-ttt-naive)
 
 
 (definline tic-tac-toe-best-move 
@@ -57,10 +57,7 @@
 [board p coords]
   (let [np (core/update-position p coords)]     
     (assoc board (core/getListPosition np) np))) 
-       
-    
-(definline full-board? [b]
- `(not-any? nil? ~b))                 
+                     
 
 (defn match-win "Returns the winning direction [1 , -1] or nil. " 
 [b]
@@ -81,7 +78,7 @@
  
 (defn game-over? [b]
   (or (winner b)
-      (full-board? b)))
+      (core/full-board? b)))
  
 (defn start-tictactoe! [_] 
 "Start a tic-tac-toe game. Returns the starting-board."
@@ -95,8 +92,12 @@
 ([b d]
   (let [dummy (TicTacToePiece. d nil nil)] 
     (core/getMoves dummy b nil)))
-([b d _] ;;we need this in order to fit with the parallel minimax implementation
+([b d _] ;;we need this in order to fit with the minimax implementation
   (team-moves b d)) )
+
+(defn score-ttt-naive [b dir] 
+ (if-let [w (winner b)] 
+   (* (get shape->dir w) dir) 0))  
                 
 (def details "The map that describes the game of tic-tac-toe."
               {:name 'Tic-Tac-Toe
@@ -105,7 +106,7 @@
                :images {'X (ut/make-image "images/133px/tic-tac-toe-X.png") 
                         'O (ut/make-image "images/133px/tic-tac-toe-O.png")}
                :characteristics [:direction :image :position]      
-               :board-size 9
+               :board-size 8 ;;0-8
                :arena-size [420 :by 530]
                :tiles (map vector (for [x (range 0 420 133) 
                                         y (range 0 530 133)] [x y]) 
@@ -113,12 +114,13 @@
                :tile-size 133
                :total-pieces 0
                :mover move
-               :scorer (fn [b dir] 
-                         (if-let [w (winner b)] 
-                           (* (get shape->dir w) dir) 0))
+               :scorer score-ttt-naive
                :team-moves team-moves
+               :max-moves 9
+               :pref-depth 9
                ;:referee-gui gui-referee
                :referee-jit winner
+               :game-over?-fn  game-over?
                :board-atom current-tictactoeItems
                :game-starter start-tictactoe!
                :hinter tic-tac-toe-best-move 
@@ -127,11 +129,14 @@
                 
 (def starting-board "The empty starting board of tic-tac-toe." (core/empty-board details)) 
 
-(defn ttt-rand-move [direction b _ _] 
+(defn ttt-rand-move [direction b _ ] 
   (let [p (TicTacToePiece. direction nil nil)]
     {:move (rand-nth (core/getMoves p b nil))})) 
+    
+(def tictactoe-tournament (partial core/tournament details))
+(def tictactoe-tournament-fast (partial core/fast-tournament details))   
 
-(defn tournament
+#_(defn tournament
 "Starts a tournament between the 2 players (p1, p2). If there is no winner, returns the entire history (vector) of 
  the tournament after 100 moves. If there is a winner, a 2d vector will be returned containing both the history(1st item) 
  and the winner (2nd item)." 
@@ -141,7 +146,7 @@
  (fn [history player] 
   (let [cb (peek history) 
         win-dir (winner cb)]
-    (if (full-board? cb) (reduced (vector history (when win-dir 
+    (if (core/full-board? cb) (reduced (vector history (when win-dir 
                                                    (if (= win-dir (:direction p1)) p1 p2))))
     (conj history (->> player
                       :brain
@@ -150,7 +155,7 @@
                       core/try-move))))) 
  [sb] (take limit (cycle [p1 p2])))) ;;20 moves each should be enough
  
-(defn fast-tournament 
+#_(defn fast-tournament 
 "Same as tournament but without keeping history. If there is a winner, returns the winning direction
 otherwise returns the last board. Intended to be used with genetic training." 
 [sb p1 p2 & {:keys [limit]
@@ -158,7 +163,7 @@ otherwise returns the last board. Intended to be used with genetic training."
 (reduce 
   (fn [board player]
    (let [win-dir (winner board)]
-    (if (full-board? board) (reduced (when win-dir 
+    (if (core/full-board? board) (reduced (when win-dir 
                                      (if (= win-dir (:direction p1)) p1 p2) ))
     (->> player
           :brain
@@ -179,7 +184,7 @@ otherwise returns the last board. Intended to be used with genetic training."
   (gui/refresh :hint nil :highlighting? nil
                :selection (TicTacToePiece. (- turn) nil nil)) 
   (gui/request-canva-repaint)
-(if (full-board? @current-tictactoeItems) (gui/alert! "GAME OVER!")
+(if (core/full-board? @current-tictactoeItems) (gui/alert! "GAME OVER!")
   (when-let [win-shape (winner @current-tictactoeItems)] 
     (do (gui/knob! :block? true) (gui/alert! (str win-shape " WON!")))))))))
 
@@ -190,18 +195,19 @@ otherwise returns the last board. Intended to be used with genetic training."
                         :activation :sigmoid
                         :input 9 ;the entire board for input
                         :output 1 ;the score
-                        :hidden [4])) ; 1 hidden layer
+                        :hidden [3])) ; 1 hidden layer
+(defn TTT-GA [pop-size]
+ (deliver s/curr-game details)
+ (core/GA brain pop-size))
+                        
 
-#_(defn score-ttt-naive [s b]
- (if-let [w (winner b)] 
-    (if (= w s) 1 -1)
- 0))
+
 ;(tournament starting-board 9 (random-player 'X) (random-player 'O))
                
                
 (defn -main [& args]
 (gui/show-gui! details)
-#_(tic-tac-toe-best-move 1 (start-tictactoe! nil) 10 score-ttt-naive))               
+#_(tic-tac-toe-best-move 1 (start-tictactoe! nil) 10))               
                
                          
                
