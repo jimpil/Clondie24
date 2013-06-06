@@ -52,7 +52,7 @@
  (getPoint [this]) ;for gui?
  (die [this])
  (promote [this np])
- (getMoves [this board with-precious-piece?] #_[this board with-precious-piece? lazy?])) 
+ (getMoves [this board with-precious-piece?])) 
  
  (defprotocol Movable 
  "The Command design pattern in action (allows us to do/undo moves)."
@@ -93,6 +93,23 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                 (:total-pieces game))]
 (vec (flatten
      (conj p2 (conj (repeat vacant nil) p1))))))
+     
+(definline gather-team "Filters all the pieces with same direction dir on this board b." 
+[b dir]
+`(filter
+   #(= ~dir (:direction %)) ~b)) ;all the team-mates (with same direction)
+   
+ 
+(definline team-moves 
+"Returns all the moves (a reducer) for the team with direction 'dir' on this board b." 
+[b dir exposes-check?]
+`(r/mapcat  
+   (fn [p#] 
+     (getMoves p# ~b ~exposes-check?)) 
+  (gather-team ~b ~dir)))
+  
+(definline full-board? [b]
+ `(not-any? nil? ~b))         
   
  
 (definline alive? [p]
@@ -109,7 +126,14 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (definline populate-board 
 "Builds a new board with nils where dead pieces." 
 [board]     
-`(into [] (r/map #(if (alive? %) % nil) ~board)))         
+`(into [] (r/map #(if (alive? %) % nil) ~board)))
+
+(defn rand-move [piece b precious?]
+ {:move (rand-nth (getMoves piece b precious?))})
+ 
+(defn rand-team-move [dir b]
+(let [all-moves (into [] (team-moves b dir true))] ;;looking for safe moves
+ {:move (rand-nth all-moves)}))          
 
 (defn move 
 "A generic function for moving Pieces. Each piece knows where it can move. 
@@ -177,23 +201,6 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defn clear-history! []
  (swap! board-history empty)) 
-
-(definline gather-team "Filters all the pieces with same direction dir on this board b." 
-[b dir]
-`(filter
-   #(= ~dir (:direction %)) ~b)) ;all the team-mates (with same direction)
-   
- 
-(definline team-moves 
-"Returns all the moves (a reducer) for the team with direction 'dir' on this board b." 
-[b dir exposes-check?]
-`(r/mapcat  
-   (fn [p#] 
-     (getMoves p# ~b ~exposes-check?)) 
-  (gather-team ~b ~dir)))
-  
-(definline full-board? [b]
- `(not-any? nil? ~b))    
 
 
 (defn vacant? 
@@ -276,18 +283,17 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 `(output ~input))  
 
 (defn neural-player 
-"Constructs a Player object given a brain b (a neural-net), a direction dir and a game-specific tree-searching fn." 
- [^BasicNetwork brain dir]
-(let [all-symbols (-> *ns* ns-publics keys)
-      symbol-strings  (map name all-symbols)
-      game-specific-searcher-fn (some #(when (re-matches #".*best-move" %) %) symbol-strings)]  
+"Constructs a Player object for a particular game, given a brain b (a neural-net), a direction dir and a game-specific searching fn [:best or :random]."  
+([game ^BasicNetwork brain dir searcher]  
 (Player. 
    (fn [leaf _] ;;ignore 2nd arg - we already have direction
      (let [normals (anormalise (neural-input leaf dir false))
            output  (double-array 1)] 
      (.compute brain normals output)
      (aget ^doubles output 0)))
- dir (resolve (symbol game-specific-searcher-fn)))))
+ dir (-> game :searchers searcher)))
+ ([game ^BasicNetwork brain dir] 
+   (-> game :searchers :best)) )
  
                
 (defn tournament
@@ -345,13 +351,15 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
   
   
 (defn GA 
-[brain pop-size & {:keys [randomizer to-mate to-mutate thread-no]
+[game brain pop-size & {:keys [randomizer to-mate to-mutate thread-no opponent-searcher total-games]
                    :or {randomizer (evo/randomizer :nguyen-widrow)
                         to-mate   0.2
                         to-mutate 0.1
+                        opponent-searcher :best
+                        total-games (int 5)
                         thread-no (+ 2 (.. Runtime getRuntime availableProcessors))}}]
 (doto 
-  (CustomNeuralGeneticAlgorithm. brain randomizer (Referee.) pop-size to-mate to-mutate)
+  (CustomNeuralGeneticAlgorithm. brain randomizer (Referee. game opponent-searcher total-games) pop-size to-mate to-mutate)
   (.setThreadCount thread-no)))                                       
                  
  
