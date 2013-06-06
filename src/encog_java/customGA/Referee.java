@@ -3,7 +3,7 @@ package encog_java.customGA;
 import java.util.Random;
 
 import org.encog.neural.networks.BasicNetwork;
-//import org.encog.neural.networks.training.CalculateScore;
+import org.encog.neural.networks.training.CalculateScore;
 import org.encog.ml.genetic.genome.Genome;
 import org.encog.ml.MLRegression;
 import org.encog.ml.genetic.population.Population;
@@ -20,48 +20,54 @@ import clojure.lang.Var;
  * */
 public final class Referee implements CalculateScore 
 {
-        //prepare java-clojure interop
-        private static IFn requireFn =   RT.var("clojure.core", "require").fn();
-        static { requireFn.invoke(Symbol.intern("Clondie24.lib.core")); }
-        private static IFn fitnessFn =   RT.var("Clondie24.lib.core", "ga-fitness").fn();//the fn we need
-        private static IFn genPlayerFn = RT.var("Clondie24.lib.core", "neural-player").fn(); 
+        
+        private static IFn requireFn = RT.var("clojure.core", "require").fn();
+         //{ requireFn.invoke(Symbol.intern("Clondie24.lib.core")); }
+        private  IFn fitnessFn;  // RT.var("Clondie24.lib.core", "ga-fitness").fn(); //the fn we need
+        private  IFn genPlayerFn; //RT.var("Clondie24.lib.core", "neural-player").fn(); 
 	
 	private Population population;
+	
+	public Referee(){ //prepare java-clojure interop
+	   requireFn.invoke(Symbol.intern("Clondie24.lib.core"));
+	   fitnessFn =   RT.var("Clondie24.lib.core", "ga-fitness").fn();//the fn we need
+	   genPlayerFn = RT.var("Clondie24.lib.core", "neural-player").fn();
+	}
 
 	
-	@Override
+	
 	public boolean shouldMinimize() 
 	{return false;}//we want to maximise scores
 
-	@Override
+	
 	public double calculateScore(final MLRegression contestant) 
 	{
 	  int noGames = 5; //5 games each
-	  double[] scores = new double[noGames];
+	  long[] scores = new long[noGames];
 	  
 	 for (int i=0;i<noGames;i++) 
 	   scores[i] = compete(contestant);
 	  
-	  return  fiveGameSum(scores);
+	  return fiveGameSum(scores);
 		
 	}
 	
-	private int compete (final MLRegression contestant){
+	private long compete (final MLRegression contestant){
 	  BasicNetwork opponent = pickRandom();
 	   if (!contestant.equals(opponent))
-	    return (Integer)fitnessFn.invoke(generatePlayer(contestant, 1), 
-	                                     generatePlayer(opponent, -1));//the actual tournament
+	    return (Long)fitnessFn.invoke(generatePlayer(contestant, 1), 
+	                                  generatePlayer(opponent, -1));//the actual tournament
 	   else 
 	    return compete(contestant);//recurse once to play with someone else
 	}
 	
-	private double fiveGameSum(double[] scores)
+	private double fiveGameSum(long[] scores)
 	{
-	  int overallScore = 0;
+	  long overallScore = 0;
             for(int i=0;i<scores.length;i++)
 	     overallScore += scores[i];
 	  
-	  return overallScore;
+	  return (double)overallScore;
 	}
 	
 	//pick a random network from the population
@@ -69,14 +75,14 @@ public final class Referee implements CalculateScore
 	{ 
 	  Random generator = new Random();
 	  //generate a random number
-	  int rand = generator.nextInt(population. getPopulationSize()); 
+	  int rand = generator.nextInt(population.getPopulationSize()); 
 		
 	  Genome genome = population.get(rand);//pick a random organism from the population
 	  BasicNetwork networkOpponent = (BasicNetwork) genome.getOrganism();//construct the network from the organism
 	 
 	  return networkOpponent;	
 	}
-	@Override
+
 	public void setPopulation(Population population){
 		this.population = population;
 	}

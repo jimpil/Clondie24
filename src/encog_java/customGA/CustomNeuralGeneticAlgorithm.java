@@ -34,11 +34,12 @@ import org.encog.ml.genetic.population.BasicPopulation;
 import org.encog.ml.genetic.population.Population;
 import org.encog.ml.train.BasicTraining;
 import org.encog.neural.networks.BasicNetwork;
-//import org.encog.neural.networks.training.CalculateScore;
+import org.encog.neural.networks.training.CalculateScore;
 import org.encog.neural.networks.training.propagation.TrainingContinuation;
 import org.encog.util.concurrency.MultiThreadable;
 import org.encog.util.logging.EncogLogging;
 import org.encog.neural.networks.training.genetic.NeuralGenome;
+import org.encog.neural.networks.training.genetic.GeneticScoreAdapter;
 
 /**
  * Implements a genetic algorithm that allows a feedforward or simple recurrent
@@ -113,8 +114,9 @@ public class CustomNeuralGeneticAlgorithm extends BasicTraining implements Multi
 			final double percentToMate) {
 		super(TrainingImplementationType.Iterative);
 		final Population population = new BasicPopulation(populationSize);
+		
 		this.genetic = new NeuralGeneticAlgorithmHelper();
-		this.genetic.setCalculateScore(new CustomGeneticScoreAdapter(calculateScore, population));//feed the population
+		this.genetic.setCalculateScore(new GeneticScoreAdapter(calculateScore));
 		getGenetic().setMutationPercent(mutationPercent);
 		getGenetic().setMatingPopulation(percentToMate * 2);
 		getGenetic().setPercentToMate(percentToMate);
@@ -122,6 +124,7 @@ public class CustomNeuralGeneticAlgorithm extends BasicTraining implements Multi
 				new Splice(network.getStructure().calculateSize() / 3));
 		getGenetic().setMutate(new MutatePerturb(4.0));
 		getGenetic().setPopulation(population);
+		((Referee) calculateScore).setPopulation(population); //feed the population
 		for (int i = 0; i < population.getPopulationSize(); i++) {
 			final BasicNetwork chromosomeNetwork = (BasicNetwork) network.clone();
 			randomizer.randomize(chromosomeNetwork);
@@ -138,7 +141,7 @@ public class CustomNeuralGeneticAlgorithm extends BasicTraining implements Multi
         {
                 Population pop = getGenetic().getPopulation();
         	for (int i = 0; i < pop.getPopulationSize(); i++) 
-                getGenetic().calculateScore(pop.get(i));
+                   getGenetic().calculateScore(pop.get(i));
         	
         	pop.sort();
         	
