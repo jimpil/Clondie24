@@ -39,7 +39,7 @@
 (defn log-board 
 "The logging function for the board ref. Will conj every new board-state into a vector." 
 [dest k r old n] 
- (when-not (= n old)  
+ (when (not= n old)  
   (swap! dest conj n)))
   
 (defrecord Player [brain ^int direction searcher])  
@@ -138,7 +138,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
      (aset  board old-pos nil) ;^"[LClondie24.games.chess.ChessPiece2;"
      (aset  board new-pos mutPiece) board))
 
-(defrecord Move [p mover ^clojure.lang.PersistentVector end-pos]
+(defrecord Move [p mover end-pos]
  Movable
  (try-move [this]  (with-meta (mover p end-pos) {:caused-by this})) ;;the board returned was caused by this move
  (getOrigin [this] (if (map? p) (:position p)
@@ -148,12 +148,13 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
    (println "#Move {:from" (:position p) ":to" end-pos)))   
 
 (defn dest->Move 
- "Constructor for creating moves from destinations. 
+ "Constructor for creating moves from destinations. Prefer this to the direct constructor. 
  It wouldn't make sense to pass more than 1 mover-fns." 
 ^Move [b p dest mover]  
  (Move. p (partial (or mover move) b) dest))
 
 (defn execute! [^Move m batom]
+;(when (not= (:end-pos m) (-> m :p :position))
  (reset! batom (try-move m)))
 
 (defn unchunk
@@ -164,7 +165,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
       (cons (first s)
             (unchunk (next s))))))
  
-(definline threatens? "Returns true if p2 is threatened by p1 on board b. This is the only time that we call getMoves with a falsey last arg." 
+(definline threatens? "Returns true if p2 is threatened by p1 on board b. This is the only time that we call getMoves with a falsy last arg." 
 [p2 p1 b]
 `(some #{(:position ~p2)} 
       (map :end-pos (getMoves ~p1 ~b false)))) 
@@ -190,6 +191,9 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
    (fn [p#] 
      (getMoves p# ~b ~exposes-check?)) 
   (gather-team ~b ~dir)))
+  
+(definline full-board? [b]
+ `(not-any? nil? ~b))    
 
 
 (defn vacant? 
@@ -285,6 +289,61 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
      (aget ^doubles output 0)))
  dir (resolve (symbol game-specific-searcher-fn)))))
  
+               
+(defn tournament
+"Starts a tournament between the 2 Players (p1, p2). If there is no winner, returns the entire history (vector) of 
+ the tournament after 100 moves. If there is a winner, a 2d vector will be returned containing both the history (1st item) and the winner (2nd item).
+ For games that can end without a winner, [history, nil] will be returned." 
+([game-details p1 p2 sb limit]
+(reduce 
+ (fn [history player] 
+  (let [cb (peek history)]
+    (if-let [win-dir ((:game-over?-fn game-details) cb)] 
+       (reduced (vector history (condp = win-dir (:direction p1) p1 (:direction p2) p2 nil)))
+    (conj history (->> player
+                      :brain
+                      ((:searcher player) (:direction player) cb) 
+                      :move
+                      try-move))))) 
+ [sb] (take limit (cycle [p1 p2])))) 
+ ([game-details p1 p2 sb] 
+   (tournament game-details p1 p2 sb 100))
+ ([game-details p1 p2] 
+   (tournament game-details p1 p2 (starting-board game-details) 100)) )
+   
+(defn fast-tournament
+"Same as tournament but without keeping history. If there is a winner, returns the winning direction
+ otherwise returns the last board. Intended to be used with genetic training."  
+([game-details p1 p2 sb limit]
+(reduce 
+ (fn [board player] 
+  (if-let [win-dir ((:game-over?-fn game-details) board)] 
+    (reduced (condp = win-dir (:direction p1) p1 (:direction p2) p2 board))
+         (->> player
+                :brain
+                ((:searcher player) (:direction player) board) 
+                :move
+                try-move))) 
+     sb (take limit (cycle [p1 p2])))) 
+ ([game-details p1 p2 sb] 
+   (tournament game-details p1 p2 sb 100))
+ ([game-details p1 p2] 
+   (tournament game-details p1 p2 (starting-board game-details) 100)) )   
+              
+  
+(defn ga-fitness
+"Scores p1 after competing with p2 starting with board b." 
+([p1 p2 b]
+(let [game (-> 'details resolve var-get) ;;MUST EXIST!!!
+      winner (fast-tournament game p1 p2 (or b (starting-board game)) (:max-moves game))]  
+(condp = winner 
+       (:direction p1)  1 ;reward p1 with 1 point
+       (:direction p2) -2 ;penalise p1 with -2 points
+       0)))               ;give 0 points - noone won 
+([p1 p2]
+  (ga-fitness p1 p2 nil)) )
+  
+  
 (defn GA 
 [brain pop-size & {:keys [randomizer to-mate to-mutate thread-no]
                    :or {randomizer (evo/randomizer :nguyen-widrow)
@@ -293,21 +352,6 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
                         thread-no (+ 2 (.. Runtime getRuntime availableProcessors))}}]
 (doto 
   (CustomNeuralGeneticAlgorithm. brain randomizer (Referee.) pop-size to-mate to-mutate)
-  (.setThreadCount thread-no)))
-  
-(defn ga-fitness
-"Scores p1 after competing with p2 starting with board b." 
-([b d p1 p2]
-(let [winner ((resolve 'fast-tournament) b d p1 p2)]
-(condp = winner 
-       (:direction p1)  1 ;reward p1 with 1 point
-       (:direction p2) -2 ;penalise p1 with -2 points
-      :else 0)))          ;give 0 points - noone won 
-([p1 p2]
-  (let [sns (symbol namespace)] 
-  (ga-fitness (resolve *ns* 'starting-board) 
-              (->> 'details (resolve *ns*) :pref-depth) p1 p2))) )   
-              
-                      
+  (.setThreadCount thread-no)))                                       
                  
  

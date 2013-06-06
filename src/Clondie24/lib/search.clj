@@ -24,7 +24,7 @@
 (defn best 
 ([]   nil)
 ([best next] 
-  (if (pos? (compare (:value best) (:value next))) 
+  (if (pos? (compare (:value best) (:value next)))
     best next)))   
 	                  
 (defn my-max 
@@ -35,18 +35,6 @@
    
 (defn my-min
 ([x y] (if (nil? x) y
-         (if (nil? y) x
-           (min x y))))
-([]  Integer/MAX_VALUE)) 
-
-(defn my-maxx 
-([x y] (if (nil? x) y
-         (if (nil? y) x
-           (max x y))))
-([]  Integer/MIN_VALUE))
-   
-(defn my-minn
-([x y a b] (if (nil? x) y
          (if (nil? y) x
            (min x y))))
 ([]  Integer/MAX_VALUE)) 
@@ -68,11 +56,10 @@
         (maximize  [tree d] (if (zero? d) (eval-fn (:root tree) (:direction tree))
                             (r/reduce my-max   
                                    (r/map (fn [child] (minimize (:tree child) (dec d))) (:children tree)))))] 
-(minimize tree (-> (:pref-depth @curr-game)
-                   dec int))))
+(minimize tree (-> (:pref-depth @curr-game) dec int))))
 
-(def minmax-TT (memoize #(minmax (:scorer @curr-game) %)));;transposition tables
-
+;(def minmax-TT (memoize #(minmax (:scorer @curr-game) %)));;transposition tables
+;(def minmax-TT (memoize minmax))
 
 
 
@@ -98,7 +85,7 @@
   (if pruning? (alpha-beta eval-fn tree)
                (minmax eval-fn tree)))
 
-
+(def search-mem (memoize search*))
     
 
 #_(defn evaluator
@@ -115,7 +102,7 @@
 (let [successors (into [] (:children (game-tree dir b next-level)))]
   (if (= 1 (count successors)) (first successors)   ;;mandatory move detected - just return it  
 (r/fold (:chunking @curr-game) best best ;2 = best so far
- (r/map #(Move-Value. (:move %) (search* (:scorer @curr-game) (:tree %) pruning?)) ;starting from children so decrement depth
+ (r/map #(Move-Value. (:move %) (search-mem (:scorer @curr-game) (:tree %) pruning?)) ;starting from children so decrement depth
                     successors )))))
 ;;---------------------------------------------------------------------------------------------------------                         
 ;--------------------------------LAZY-VERSION-------------------------------------------------------------- 

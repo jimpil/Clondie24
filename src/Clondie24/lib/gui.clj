@@ -16,7 +16,7 @@
                 :pruning? false
                 :block? false 
                 :hint nil
-                :whose-turn "Yellow"})
+                :whose-turn "Yellow"}) ;(cycle ["Yellow" "Black"])
 
 (def knobs "Various knobs for the gui. Better keep them together."
 (atom brand-new))
@@ -39,7 +39,8 @@
 `(reset! knobs brand-new)) 
 
 (definline turn [dir] ;direction of the player who just moved
-`(if (pos? ~dir) "Yellow " "Black "))
+`(if (pos? ~dir) (-> @curr-game :color-names first) 
+                 (-> @curr-game :color-names second)))
 
 (defmacro with-worker 
 "Starts a background worker thread with busy cursor on component c while busy. 
@@ -73,7 +74,7 @@
     
 (defn undo! "Go back a state." []
 (->  @curr-game
-     :board-atom
+     :board-atom 
      (reset! (peek (core/undo!)))))    
 
 (defn identify-p 
@@ -91,7 +92,7 @@
 (defn make-menubar 
 "Constructs and returns the entire menu-bar." []
 (let [a-new (ssw/action :handler (fn [e]  (reset-knobs!) ((:game-starter @curr-game) false) 
-                                          (ssw/config! status-label :text "Game on! Yellow moves first...")
+                                          (ssw/config! status-label :text (str "Game on!" (-> @curr-game :color-names first) " moves first..."))
                                           (knob! :block? false)
                                           (ssw/repaint! canvas))
                         :name (str "New " (:name @curr-game)) 
@@ -130,7 +131,7 @@
                             :name "REPL" 
                             :tip  "Show a swing-based local REPL") 
       re-repl (ssw/action   :handler (fn [e] (sre/defserver Clondie24-nREPL  8989 false) 
-                            (ssw/alert (str "nREPL server is up and running! Make a note of the following:\nI.P. = " (ut/external-ip) "\nPort = 8989\nName = Clondie24-nREPL")) )    
+                            (ssw/alert (str "nREPL server is up and running! Make a note of the following:\nIP address = " (ut/external-ip) "\nPort = 8989\nName = Clondie24-nREPL")) )    
                             :name "nREPL server" 
                             :tip  "Start nREPL server that accepts remote clients.")
       a-bout    (ssw/action :handler (fn [e] (ssw/alert "Not implemented!")) 
@@ -231,6 +232,10 @@
     ))
 
 (def status-label (ssw/label :id :status :text "Ready!"))
+
+(definline opposite-color-of [^String color]
+ `(let [[c1# c2#] (:color-names @curr-game)] 
+    (if (= ~color c1#) c2# c1#)))
     
 (defn arena "Constructs and returns the entire arena frame." []
  (ssw/frame
@@ -246,8 +251,11 @@
                :north  (ssw/horizontal-panel :items 
                        [(ssw/button :text "Undo"  :listen [:action (fn [e] (when-not (:block? @knobs) 
                                                                            (do (refresh :highlighting? false 
-                                                                                        :hint nil) 
-                                                                               (undo!) (ssw/repaint! canvas))))]) [:fill-h 10] 
+                                                                                        :hint nil 
+                                                                                        :whose-turn (opposite-color-of (:whose-turn @knobs)))        
+                                                                               (undo!)
+                                                                               (ssw/config! status-label :text (str (:whose-turn @knobs) " moves next..."))
+                                                                               (ssw/repaint! canvas))))]) [:fill-h 10] 
                         (ssw/button :text "Clear" 
                                     :listen [:action 
                                              (fn [e] (when-not (:block? @knobs)
@@ -315,7 +323,7 @@
             :highlighting? false
             :hint nil
             :selection nil)
-   (ssw/config! status-label :text (str (:whose-turn @knobs) "moves..."))
+   (ssw/config! status-label :text (str (:whose-turn @knobs) " moves next..."))
     (ssw/repaint! canvas))))))
 
 (defn request-canva-repaint []
