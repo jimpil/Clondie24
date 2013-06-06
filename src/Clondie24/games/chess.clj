@@ -58,9 +58,7 @@
  ([dir b pruning?] (s/go dir b pruning?)))
   
 
-(defn chess-rand-move [dir b] ;;need same arity as 'chess-best-move'
-(let [all-moves (into [] (core/team-moves b dir true))]
-{:move (rand-nth all-moves)})) 
+(def chess-rand-move core/rand-team-move)
 
 (def current-chessItems
 "This is list that keeps track of moving chess pieces. Is governed by an atom and it changes after every move. 
@@ -228,6 +226,8 @@ black? specifies the side of the board where the pieces should be placed (true f
                :game-over?-fn  jit-referee
                :scorer core/score-chess-naive ;;don't have any other scorers
                :naive-scorer core/score-chess-naive
+               :searchers {:random chess-rand-move 
+                           :best chess-best-move}
                :pref-depth 4
                :max-moves 100
                :board-atom current-chessItems
@@ -384,7 +384,11 @@ otherwise returns the last board. Intended to be used with genetic training."
 
 
 (defn naive-player [dir]
-(Player. core/score-chess-naive dir chess-best-move))        
+(Player. core/score-chess-naive dir chess-best-move)) 
+
+(defn chess-GA [pop-size]
+ (deliver s/curr-game details)
+ (core/GA brain pop-size))       
 
 #_(ut/data->string buffered-moves "machine-performance.cheat") 
 (def buffered-moves (ut/string->data "machine-performance.cheat"))  ;it's faster to read them from file than recalculate       

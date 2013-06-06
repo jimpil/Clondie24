@@ -23,13 +23,8 @@
 (def shape->dir {'X -1 'O 1}) ;;we use direction to represent shape
 (def dir->shape {-1 'X 1 'O})
 (def turns (atom (cycle ['X 'O])))
-;(defrecord Player [brain shape searcher])
 (declare details starting-board game-over? move score-ttt-naive)
 
-
-(definline tic-tac-toe-best-move 
-  [dir b _] 
-`(s/go-lazy ~dir ~b))
 
 (def current-tictactoeItems 
 (add-watch (atom nil) 
@@ -49,7 +44,13 @@
      (map #(core/dest->Move b this % move)) )))
  Object
  (toString [this] 
-   (println (str (get dir->shape direction)" -> " position))) )          
+   (println (str (get dir->shape direction)" -> " position))) ) 
+   
+(definline tic-tac-toe-best-move 
+  [dir b] 
+`(s/go-lazy ~dir ~b))
+
+(def ttt-rand-move (fn [dir b] (core/rand-move (TicTacToePiece. dir nil nil) b nil))) ;same arity as ttt-best-move            
                
 (defn move 
 "The function responsible for placing tic-tac-toe pieces. 
@@ -88,7 +89,7 @@
  (deliver s/curr-game details)
   (reset! current-tictactoeItems starting-board)) 
   
-(defn team-moves 
+(defn team-moves  
 ([b d]
   (let [dummy (TicTacToePiece. d nil nil)] 
     (core/getMoves dummy b nil)))
@@ -116,6 +117,8 @@
                :mover move
                :scorer score-ttt-naive
                :team-moves team-moves
+               :searchers {:random ttt-rand-move 
+                           :best tic-tac-toe-best-move} 
                :max-moves 9
                :pref-depth 9
                ;:referee-gui gui-referee
@@ -128,50 +131,10 @@
                :mappings board-mappings-tic-tac-toe})
                 
 (def starting-board "The empty starting board of tic-tac-toe." (core/empty-board details)) 
-
-(defn ttt-rand-move [direction b _ ] 
-  (let [p (TicTacToePiece. direction nil nil)]
-    {:move (rand-nth (core/getMoves p b nil))})) 
-    
+       
 (def tictactoe-tournament (partial core/tournament details))
 (def tictactoe-tournament-fast (partial core/fast-tournament details))   
-
-#_(defn tournament
-"Starts a tournament between the 2 players (p1, p2). If there is no winner, returns the entire history (vector) of 
- the tournament after 100 moves. If there is a winner, a 2d vector will be returned containing both the history(1st item) 
- and the winner (2nd item)." 
-[sb depth p1 p2 & {:keys [limit]
-                   :or   {limit 20}}]
-(reduce 
- (fn [history player] 
-  (let [cb (peek history) 
-        win-dir (winner cb)]
-    (if (core/full-board? cb) (reduced (vector history (when win-dir 
-                                                   (if (= win-dir (:direction p1)) p1 p2))))
-    (conj history (->> player
-                      :brain
-                      ((:searcher player) (:direction player) cb depth) 
-                      :move
-                      core/try-move))))) 
- [sb] (take limit (cycle [p1 p2])))) ;;20 moves each should be enough
  
-#_(defn fast-tournament 
-"Same as tournament but without keeping history. If there is a winner, returns the winning direction
-otherwise returns the last board. Intended to be used with genetic training." 
-[sb p1 p2 & {:keys [limit]
-             :or   {limit 20}}]
-(reduce 
-  (fn [board player]
-   (let [win-dir (winner board)]
-    (if (core/full-board? board) (reduced (when win-dir 
-                                     (if (= win-dir (:direction p1)) p1 p2) ))
-    (->> player
-          :brain
-          ((:searcher player) (:direction player) board)
-          :move
-           core/try-move)))) 
- sb (take limit (cycle [p1 p2])))) ;;100 moves should be enough 
-
 (defmethod gui/canva-react 'Tic-Tac-Toe [_ ^java.awt.event.MouseEvent e]
 (let [spot  (vector (.getX e) (.getY e))
       bspot (mapv (ut/balance :down (:tile-size details)) spot)]
@@ -195,10 +158,10 @@ otherwise returns the last board. Intended to be used with genetic training."
                         :activation :sigmoid
                         :input 9 ;the entire board for input
                         :output 1 ;the score
-                        :hidden [3])) ; 1 hidden layer
+                        :hidden [])) ; 0 hidden layer
 (defn TTT-GA [pop-size]
  (deliver s/curr-game details)
- (core/GA brain pop-size))
+ (core/GA brain pop-size :opponent-searcher :random  :total-games 100))
                         
 
 
