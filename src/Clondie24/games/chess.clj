@@ -63,7 +63,8 @@
 {:move (rand-nth all-moves)})) 
 
 (def current-chessItems
-"This is list that keeps track of moving chess pieces. Is governed by an atom and it changes after every move. All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
+"This is list that keeps track of moving chess pieces. Is governed by an atom and it changes after every move. 
+ All changes are being logged to 'board-history'. Starts off as nil but we can always get the initial arrangement from core."
  (-> (atom nil)
    (add-watch  :log (partial core/log-board core/board-history))
    #_(add-watch  :last-move (fn [k r old n] (swap! r conj n)))))
@@ -213,6 +214,7 @@ black? specifies the side of the board where the pieces should be placed (true f
                :arena-size [421 :by 530]
                :tile-size 50
                :alternating-colours chess-board-colours
+               :color-names ["Yellow" "Black"]
                :tiles (mapv vector (for [x (range 0 421 50) 
                                          y (range 0 530 50)] [x y]) 
                                    (cycle chess-board-colours))
@@ -223,9 +225,11 @@ black? specifies the side of the board where the pieces should be placed (true f
                :mover core/move
                :referee-gui gui-referee
                :referee-jit jit-referee
+               :game-over?-fn  jit-referee
                :scorer core/score-chess-naive ;;don't have any other scorers
                :naive-scorer core/score-chess-naive
                :pref-depth 4
+               :max-moves 100
                :board-atom current-chessItems
                :game-starter start-chess!
                :hinter chess-best-move 
@@ -264,18 +268,16 @@ black? specifies the side of the board where the pieces should be placed (true f
        (core/dest->Move b [king, qrook]  [[(- kx 2) ky], [(dec kx) ky]] castling-mover))) ;;queenside castling-move
   (remove nil? castlings))))
 
-(defn en-passant-mover [b p np]
+(defn en-passant-mover [b p [nx ny :as np]]
    (let [newPiece (core/update-position p np) ;the new piece as a result of moving 
          old-pos  (core/getListPosition p)
          new-pos  (core/getListPosition newPiece)
          mov-dir  (ut/resolve-direction (:position p) np)]
       (when-let [en-passant-capture  (cond
                                          (or (= mov-dir :south-east) 
-                                             (= mov-dir :south-west)) (core/translate-position 
-                                                                            (first np) (dec (second np)) core/mappings-8x8)
-                                        (or (= mov-dir :north-east) 
-                                            (= mov-dir :north-west)) (core/translate-position
-                                                                            (first np) (inc (second np)) core/mappings-8x8)
+                                             (= mov-dir :south-west)) (core/translate-position nx (dec ny) core/mappings-8x8)
+                                         (or (= mov-dir :north-east) 
+                                             (= mov-dir :north-west)) (core/translate-position nx (inc ny) core/mappings-8x8)
                                :else nil)]
       (assoc b old-pos nil 
                new-pos newPiece
@@ -283,16 +285,16 @@ black? specifies the side of the board where the pieces should be placed (true f
 
 
 (defn en-passant-move [b pawn]
-  (when-let [last-move (:caused-by (meta b))]
+  (when-let [last-move (-> b meta :caused-by)] 
       (let [last-moving-piece (:p last-move)]  
         
   (when  (and 
          (and (= 'pawn (:rank last-moving-piece))
               (not= (:direction pawn) (:direction last-moving-piece)))
-         (= 1 (Math/abs ^long (- (first (:position pawn)) ;;side by side (x +/- 1)
+         (= 1 (Math/abs (- (first (:position pawn)) ;;side by side (x +/- 1)
                                  (first (:end-pos last-move)))))
          (= (second (:position pawn)) (second(:end-pos last-move))) ;;same y
-         (= 2 (Math/abs ^long (- (second (:position last-moving-piece)) 
+         (= 2 (Math/abs (- (second (:position last-moving-piece)) 
                                  (second (:end-pos last-move)))))) ;;previous pawn  jumped 2 squares
          (core/dest->Move b pawn 
                           (if (neg? (:direction pawn)) 
@@ -333,16 +335,16 @@ black? specifies the side of the board where the pieces should be placed (true f
                ((keyword %) (:rel-values details)) nil)) 
       ['rook 'knight 'bishop 'queen 'king])))))))
       
-      
-
 
 #_(defn normalize-fields [ins outs]
 ((norm/prepare :range [ins] [outs]) false 
   (norm/target-storage :norm-array [64 nil])))          
   
 
+(def chess-tournament (partial core/tournament details))
+(def chess-tournament-fast (partial core/fast-tournament details))
 
-(defn tournament
+#_(defn tournament
 "Starts a tournament between the 2 players (p1, p2). If there is no winner, returns the entire history (vector) of 
  the tournament after 100 moves. If there is a winner, a map will be returned containing :history and the :winner." 
 [sb p1 p2 & {:keys [limit]
@@ -361,7 +363,7 @@ black? specifies the side of the board where the pieces should be placed (true f
  (transient [sb]) (take limit (cycle [p1 p2])))) ;;100 moves should be enough
   
  
-(defn fast-tournament 
+#_(defn fast-tournament 
 "Same as tournament but without keeping history. If there is a winner, returns the winning direction
 otherwise returns the last board. Intended to be used with genetic training." 
 [sb p1 p2 & {:keys [limit]
