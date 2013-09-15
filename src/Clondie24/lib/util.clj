@@ -5,6 +5,7 @@
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------
 (set! *unchecked-math* true)
+(set! *warn-on-reflection* true)
 
 (defn- with-thread-pool* [num-threads f]
   (let [pool (java.util.concurrent.Executors/newFixedThreadPool num-threads)]
@@ -82,7 +83,7 @@
 ([how] (balance how 50))
 ([how how-much] 
  (case how
-      :up   (partial * how-much)
+      :up   #(* how-much %)
       :down (comp int #(/ % how-much)))))
     
 (defn vector-of-doubles [v]
@@ -104,8 +105,7 @@
 (defn make-image 
 "Returns a buffered-image from the specified file or nil if the file is not there." 
 [^String path-to-image]
-(try 
-  (javax.imageio.ImageIO/read (java.io.File. path-to-image))
+(try  (javax.imageio.ImageIO/read (java.io.File. path-to-image))
 (catch java.io.IOException e ;returning nil here  
   (println path-to-image "does not exist! Reverting to nil..."))))
 
@@ -114,34 +114,37 @@
 "Helper fn for creting java.awt.Color given a color symbol (e.g 'RED or 'red)."
 ^java.awt.Color [name]
 (.get (.getField 
-        (Class/forName "java.awt.Color") (str name)) nil))
+        (Class/forName "java.awt.Color") (str name)) nil))       
 
 (defn hex->color 
 "Hepler fn for creating Color objects from a hex literal (e.g. '0xFF0096)."
- [hex-symbol] 
+ ^java.awt.Color [hex-symbol] 
  (try (java.awt.Color/decode (str hex-symbol)) 
  (catch Exception e ; returning nil 
         (println "Incorrect hex mapping."))))
          
 (defn hsb->color 
 "Hepler fn for creating Color objects from hue/saturation/brightness (e.g. 0.56, 1, 0.8)." 
-[h s b]
+^java.awt.Color  [h s b]
 (java.awt.Color/getHSBColor (float h) (float s) (float b)))
 
-(defn rgb->color [r g b] 
+(defn rgb->color 
+^java.awt.Color  [r g b] 
  (java.awt.Color. (double r) (double g) (double b)))             
       
-(defn piece->point [p] ;needs to be in the gui namespace
- (let [[x y] (.getGridPosition  p)]
+(defn piece->point 
+^java.awt.Point [p] ;needs to be in the gui namespace
+ (let [[x y] (or (:position  p) 
+                 (.getGridPosition p))]
  (java.awt.Point. x y))) 
  
  (defn Point->Vec [^java.awt.Point p]
  (vector (.x p) (.y p)))
  
-(defn no-nils 
+(definline no-nils 
 "Filter out nils from a collection." 
  [c] 
- (remove nil? c))  
+ `(remove nil? ~c))  
  
 (defn print-board 
 "Will print the detailed board with nils where vacant." 
@@ -150,16 +153,14 @@
       (deref (:board-atom game))))  ;the rows
 
 (defn serialize! 
-"Serialize the object b on to the disk using standard Java serialization. 
- Filename needs no extension - it will be appended (.ser)."
+"Serialize the object b on to the disk using standard Java serialization."
 [b fname]
 (with-open [oout (java.io.ObjectOutputStream. 
                   (java.io.FileOutputStream. fname))]
   (.writeObject oout b)))
                 
 (defn deserialize! 
-"Deserializes the object  in file f from the disk using standard Java serialization. 
- Filename needs no extension - it will be appended (.ser)." 
+"Deserializes the object  in file f from the disk using standard Java serialization." 
  [fname]
 (with-local-vars [upb nil]  ;;waiting for the value shortly
   (with-open [oin (java.io.ObjectInputStream. 
@@ -171,14 +172,19 @@
 (defn data->string
 "Writes the object b on a file f on disk as a string."
 [b f]
-(io!
-(with-open [w (clojure.java.io/writer f)]
+(io! (spit f b)
+#_(with-open [w (clojure.java.io/writer f)]
   (binding [*out* w]  (prn b))))) 
 
 (defn string->data
 "Read the file f back on memory safely. Contents of f should be a clojure data-structure." 
-[f]
- (edn/read-string (slurp f)))                            
+([f game-details]
+(io!
+ (edn/read-string {:readers (get game-details :readers)} (slurp f))))
+([f]  
+  (string->data f {:readers {}}
+  #_{'Clondie24.games.chess.ChessPiece #'Clondie24.games.chess/chesspiece-reader
+   'Clondie24.games.tictactoe.TicTacToePiece #'Clondie24.gamestictactoe/ttt-piece-reader})))                             
 
          
 (defn old-table-model 
@@ -240,8 +246,10 @@
           
 (definline resolve-direction 
 [sp ep]
-`(let [dx# (- (first ~ep) (first ~sp))
-       dy# (- (second ~ep) (second ~sp))]
+`(let [dx# (- (first ~ep) 
+              (first ~sp))
+       dy# (- (second ~ep) 
+              (second ~sp))]
 (cond 
    (and (neg? dx#)  (zero? dy#)) :west
    (and (pos? dx#)  (zero? dy#)) :east
@@ -255,7 +263,7 @@
 (defn round-neighbours 
 "Returns all the neighbouring positions using the specified distance on a dimx*dimy board."
 ([[x y] distance [dimx dimy]]
-  (let [in-board? (partial within-limits? [dimx dimy])]  
+  (let [in-board? #(within-limits? [dimx dimy] %)]  
     (for [dx (range (- distance) (inc distance))   
           dy (range (- distance) (inc distance)) 
             :let [new-pos [(+ dx x) (+ dy y)]]
@@ -265,32 +273,32 @@
   ([[x y] distance] (round-neighbours [x y] distance [8 8]))
   ([[x y]] (round-neighbours [x y] 1 [8 8])) )
 
-(defn horizontal-neighbours 
-  "Returns all the horizontally neighbouring positions using the specified distance on a dimx*dimy board."
+(defn vertical-neighbours 
+  "Returns all the vertically neighbouring positions using the specified distance on a dimx*dimy board."
  ([[x y] distance [dimx dimy]]
-   (let [in-board? (partial within-limits? [dimx dimy])]
+   (let [in-board? #(within-limits? [dimx dimy] %)]
      (for [dy (range (- distance) (inc distance))  
         :let [tempy [x (+ dy y)]] ;x stays constant
         :when (and (not= 0 dy) 
                    (in-board? tempy))] tempy)))
- ([[x y] distance] (horizontal-neighbours [x y] distance [8 8]))
- ([[x y]] (horizontal-neighbours [x y] 1 [8 8])) )
+ ([[x y] distance] (vertical-neighbours [x y] distance [8 8]))
+ ([[x y]] (vertical-neighbours [x y] 1 [8 8])) )
 
-(defn vertical-neighbours 
-  "Returns all the vertically neighbouring positions using the specified distance on a dimx*dimy board."
+(defn horizontal-neighbours 
+  "Returns all the horizontally neighbouring positions using the specified distance on a dimx*dimy board."
  ([[x y] distance [dimx dimy]]
-   (let [in-board? (partial within-limits? [dimx dimy])]
+   (let [in-board? #(within-limits? [dimx dimy] %)]
      (for [dx (range (- distance) (inc distance))
         :let [tempx [(+ dx x) y]] ;y stays constant
         :when (and (not= 0 dx) 
-              (in-board? tempx))] tempx)))
- ([[x y] distance] (vertical-neighbours [x y] distance [8 8]))
- ([[x y]] (vertical-neighbours [x y] 1 [8 8])) )
+                   (in-board? tempx))] tempx)))
+ ([[x y] distance] (horizontal-neighbours [x y] distance [8 8]))
+ ([[x y]] (horizontal-neighbours [x y] 1 [8 8])) )
 
 (defn diagonal-neighbours 
   "Returns all the diagonnally neighbouring positions using the specified distance on a dimx*dimy board."
  ([[x y] distance [dimx dimy]]
-   (let [in-board? (partial within-limits? [dimx dimy])]
+   (let [in-board? #(within-limits? [dimx dimy] %)]
      (for [dx (range (- distance) (inc distance))
            dy (range (- distance) (inc distance)) 
         :let [[nx ny :as new-pos] [(+ dx x) (+ dy y)]]
@@ -314,8 +322,21 @@
           (rook-moves   pos)))
 
 (defn king-moves [[x y :as pos]]
-  (round-neighbours 7))            
+  (round-neighbours pos 1))              
    
+#_(defn pawn-moves** [b [x y :as pos] dir]
+  (let [infrnt (ut/vertical-neighbours pos 2)
+        [one two :as in-front] (if (neg? dir) (filter #(> y (second %)) infrnt)
+                                              (filter #(< y (second %)) infrnt))
+        frd (ut/diagonal-neighbours pos 1)
+        [three four :as front-diag] (if (neg? dir) (filter #(> y (second %)) frd) 
+                                                   (filter #(< y (second %)) frd)) ]
+   (if 
+      (or (= y 6) 
+          (= y 1)) (concat (filter #(core/vacant? board-mappings-chess b %) in-front)
+                           (filter #(core/occupied? board-mappings-chess b %) front-diag))   
+     (concat (filter #(core/occupied? board-mappings-chess b %) front-diag) 
+             (filter #(= 1 (* dir (- (second %) y))) in-front)))) )   
         
 (defn external-ip "Returns the external ip address of the machine this code is running on, as a string." 
  ^String []
@@ -323,5 +344,11 @@
 (with-open [in (java.io.BufferedReader. 
                (java.io.InputStreamReader. (.openStream ip-url)))]
 (.readLine in))))
+
+(definline some-element 
+"Like some but returns the element for which (pred x) returned a truthy value rather than the truthy value itself. 
+ Useful for predicates that return true/false when actually we want to get the element and we don't really care about the boolean." 
+[pred coll]
+`(some #(when (~pred %) %) ~coll))
 
 
