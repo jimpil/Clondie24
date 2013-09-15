@@ -27,29 +27,27 @@ public final class Referee implements CalculateScore
          //{ requireFn.invoke(Symbol.intern("Clondie24.lib.core")); }
         private final IFn fitnessFn;  // RT.var("Clondie24.lib.core", "ga-fitness").fn(); //the fn we need
         private final IFn genPlayerFn; //RT.var("Clondie24.lib.core", "neural-player").fn();
+        private final IFn tournaFn;
         private final Random generator;
-        private final Keyword oppoSearcher;
+       // private final Keyword oppoSearcher;
         private final int totalGames;
-        private final Map<clojure.lang.Keyword, Object> GAME;
+        private final Map<Keyword, Object> GAME;
 	
 	private Population population;
 	
-	public Referee(Map<clojure.lang.Keyword, Object> game, Keyword oppoSearcher, int tgames){ //prepare java-clojure interop
+	public Referee(Map<Keyword, Object> game, IFn tournaFn, int tgames){ //prepare java-clojure interop
 	   GAME = game;
 	   requireFn.invoke(Symbol.intern("Clondie24.lib.core"));
 	   fitnessFn =   RT.var("Clondie24.lib.core", "ga-fitness").fn();//the fn we need
 	   genPlayerFn = RT.var("Clondie24.lib.core", "neural-player").fn();
 	   generator = new Random();
-	   this.oppoSearcher = oppoSearcher;
+	   this.tournaFn = tournaFn;
+	   //this.oppoSearcher = oppoSearcher;
 	   totalGames = tgames; 
 	}
 	
-	public Referee(Map<Keyword, Object> game, Keyword oppoSearcher){
-	   this(game, oppoSearcher, 5);
-	}
-	
-	public Referee(Map<Keyword, Object> game){
-	  this(game, Keyword.intern("best")); 
+	public Referee(Map<Keyword, Object> game,  IFn tournaFn){
+	   this(game, tournaFn, 5);
 	}
 	
 	
@@ -59,21 +57,22 @@ public final class Referee implements CalculateScore
 	
 	public double calculateScore(final MLRegression contestant) 
 	{
-	  int noGames = totalGames; //5 games each
+	  int noGames = totalGames; //x games each
 	  long[] scores = new long[noGames];
 	  
 	 for (int i=0;i<noGames;i++) 
 	   scores[i] = compete(contestant);
 	  
-	  return gameSum(scores);
+	  return gameSum(scores) / noGames;
 		
 	}
 	
 	private long compete (final MLRegression contestant){
 	  BasicNetwork opponent = pickRandom();
-	   if (!contestant.equals(opponent))
-	    return (Long)fitnessFn.invoke(generatePlayer(GAME, contestant, 1), 
-	                                  generatePlayer(GAME, opponent,  -1, oppoSearcher)); //the actual tournament
+	   if (contestant != opponent)
+	    return (Long)fitnessFn.invoke(tournaFn,
+	                                  generatePlayer(GAME, contestant, 1), 
+	                                  generatePlayer(GAME, opponent,  -1)); //the actual tournament
 	   else 
 	    return compete(contestant);//recurse once to play with someone else
 	}
@@ -92,7 +91,7 @@ public final class Referee implements CalculateScore
 	{ 
 	  //Random generator = new Random();
 	  //generate a random number
-	  int rand = generator.nextInt(population.getPopulationSize()); 
+	  int rand = generator.nextInt(population.getPopulationSize() / 2); //get an organism from the best half of the population
 		
 	  Genome genome = population.get(rand);//pick a random organism from the population
 	  BasicNetwork networkOpponent = (BasicNetwork) genome.getOrganism();//construct the network from the organism
@@ -108,11 +107,8 @@ public final class Referee implements CalculateScore
 		return population;
 	}
 	
-	private Object generatePlayer(Map<clojure.lang.Keyword, Object> game, MLRegression brain, int direction){
+	private Object generatePlayer(Map<Keyword, Object> game, MLRegression brain, int direction){
 	 return genPlayerFn.invoke(game, brain, direction);
-	}
-	private Object generatePlayer(Map<clojure.lang.Keyword, Object> game, MLRegression brain, int direction, Keyword oppoSearcher){
-	 return genPlayerFn.invoke(game, brain, direction, oppoSearcher);
 	}
 
 }
