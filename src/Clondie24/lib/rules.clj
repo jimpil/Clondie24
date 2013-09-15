@@ -7,7 +7,7 @@
        
 (set! *unchecked-math* true)       
              
-(def ^:const board (vec (range 8)))
+(defonce ^:const board (vec (range 8)))
                            
 
 (defn bishop-moves 
@@ -27,35 +27,35 @@
      
 (defn pawn-moves 
 "Returns the logical moves for a pawn (on a 8x8 grid) given its current position and direction." 
-[m boa x y dir]
- (let [xmax 8 ymax 8]
+[m boa x y dir] ;(println "NOT CACHED! -> " x " , " y)
+ (let [xmax 8 ymax 8 fr1 (first boa) fr2 (get boa 1) dia- (get boa 2) dia+ (get boa 3)]
  (if (pos? dir) ;if moving south
   (run* [q] 
   (fresh [a b]
   (conde  
-     [(= y 1) (= nil (get boa (try (translate-position x (+ y 2) m) (catch Exception e -1)))) 
+     [(= y 1) (= nil fr2 #_(get boa (try (translate-position x (+ y 2) m) (catch Exception e -1)))) 
       (== a x) (== b (+ y 2))] ;1st possibility (2 steps)
-     [(< (inc y) ymax) (= nil (get boa (try (translate-position x (inc y) m) (catch Exception e -1))))  
+     [(< (inc y) ymax) (= nil fr1 #_(get boa (try (translate-position x (inc y) m) (catch Exception e -1))))  
       (== a x) (== b (inc y))] ;2nd possibility (1 step)
-     [(< (inc y) ymax) (< (inc x) xmax) (!= nil (get boa (try (translate-position (inc x) (inc y) m) (catch Exception e -1))))
-      (!= dir (:direction (get boa (try (translate-position (inc x) (inc y) m) (catch Exception e -1))))) 
+     [(< (inc y) ymax) (< (inc x) xmax) (!= nil dia+ #_(get boa (try (translate-position (inc x) (inc y) m) (catch Exception e -1))))
+      (!= dir (:direction dia+ #_(get boa (try (translate-position (inc x) (inc y) m) (catch Exception e -1))))) 
       (== a (inc x)) (== b (inc y))] ;kill
-     [(< (inc y) ymax) (>= (dec x) 0)  (!= nil (get boa (try (translate-position (dec x) (inc y) m) (catch Exception e -1)))) 
-      (!= dir (:direction (get boa (try (translate-position (dec x) (inc y) m) (catch Exception e -1))))) 
+     [(< (inc y) ymax) (>= (dec x) 0)  (!= nil dia- #_(get boa (try (translate-position (dec x) (inc y) m) (catch Exception e -1)))) 
+      (!= dir (:direction dia- #_(get boa (try (translate-position (dec x) (inc y) m) (catch Exception e -1))))) 
       (== a (dec x)) (== b (inc y))]) ;kill 
     (== q [a b])))
   (run* [q] ;else moving north
   (fresh [a b]
   (conde  
-    [(= y 6) (= nil (get boa (try (translate-position x (- y 2) m) (catch Exception e -1)))) 
+    [(= y 6) (= nil fr2 #_(get boa (try (translate-position x (- y 2) m) (catch Exception e -1)))) 
      (== a x) (== b (- y 2))]  ;1st possibility (2 steps)
-    [(>= (dec y) 0) (= nil (get boa (try (translate-position x (dec y) m) (catch Exception e -1)))) 
+    [(>= (dec y) 0) (= nil fr1 #_(get boa (try (translate-position x (dec y) m) (catch Exception e -1)))) 
      (== a x) (== b (dec y))]  ;2nd possibility (1 step)
-    [(>= (dec y) 0) (< (inc x) xmax) (!= nil (get boa (try (translate-position (inc x) (dec y) m) (catch Exception e -1))))
-     (!= dir (:direction (get boa (try (translate-position (inc x) (dec y) m) (catch Exception e -1)))))
+    [(>= (dec y) 0) (< (inc x) xmax) (!= nil dia+ #_(get boa (try (translate-position (inc x) (dec y) m) (catch Exception e -1))))
+     (!= dir (:direction dia+ #_(get boa (try (translate-position (inc x) (dec y) m) (catch Exception e -1)))))
       (== a (inc x)) (== b (dec y))] ;kill
-    [(>= (dec y) 0) (>= (dec x) 0) (!= nil (get boa (try (translate-position (dec x) (dec y) m) (catch Exception e -1))))  
-    (!= dir (:direction (get boa (try (translate-position (dec x) (dec y) m) (catch Exception e -1))))) 
+    [(>= (dec y) 0) (>= (dec x) 0) (!= nil dia- #_(get boa (try (translate-position (dec x) (dec y) m) (catch Exception e -1))))  
+    (!= dir (:direction dia- #_(get boa  (try (translate-position (dec x) (dec y) m) (catch Exception e -1))))) 
     (== a (dec x)) (== b (dec y))]) ;kill
     (== q [a b]))))))
     
