@@ -16,6 +16,7 @@
                 :pruning? false
                 :block? false 
                 :hint nil
+                :players []
                 :whose-turn "Yellow"}) ;(cycle ["Yellow" "Black"])
 
 (def knobs "Various knobs for the gui. Better keep them together."
@@ -91,31 +92,34 @@
             
 (defn make-menubar 
 "Constructs and returns the entire menu-bar." []
-(let [a-new (ssw/action :handler (fn [e]  (reset-knobs!) ((:game-starter @curr-game) false) 
+(let [a-new (ssw/action :handler (fn [e]  
+                                   (let [ng ((:game-starter @curr-game) false)]
+                                          (reset-knobs!)    
+                                          (knob! :players (:players ng))
                                           (ssw/config! status-label :text (str "Game on!" (-> @curr-game :color-names first) " moves first..."))
                                           (knob! :block? false)
-                                          (ssw/repaint! canvas))
+                                          (ssw/repaint! canvas)))
                         :name (str "New " (:name @curr-game)) 
                         :tip  "Start new game." 
                         :key  "menu N")                           
       a-save (ssw/action :handler (fn [e] (choo/choose-file :type :save
                                                             :filters [["Clojure-data" ["clo"]]] ;;use java serialisation for now
-                                                            :success-fn (fn [_ f] (ut/serialize! @core/board-history f))))
+                                                            :success-fn (fn [_ f] (ut/data->string @core/board-history f) #_(ut/serialize! @core/board-history f))))
       
                         :name "Save" 
                         :tip "Save a game to disk." 
                         :key "menu S")
       a-load (ssw/action :handler (fn [e] 
                                     (when-let [f (choo/choose-file :filters [["Clojure-data" ["clo"]]])]  
-                                    (reset! core/board-history (ut/deserialize! f)) ;;use java serialisation for now
+                                    (reset! core/board-history (ut/string->data f @curr-game) #_(ut/deserialize! f)) ;;use java serialisation for now
                                     (ssw/repaint! canvas)))
                         :name "Load" 
                         :tip  "Load a game from disk." 
                         :key  "menu L")
-      a-quit (ssw/action :handler (fn [e] (when-let [repl-var (ns-resolve 'Clondie24.lib.gui 'Clondie24-nREPL)] 
-                                            (try (sre/stop (var-get repl-var)) 
-                                            (catch Exception e nil)) )
-                                          (System/exit 0)) 
+      a-quit (ssw/action :handler (fn [e] (let [repl-server-var (find-var 'Clondie24.lib.gui/Clondie24-nREPL)]
+           			           (if (bound? repl-server-var)
+            				    (do (sre/stop (var-get repl-server-var)) (System/exit 0))
+            				    (System/exit 0))))
                          :name "Quit" 
                          :tip  "Close arena" 
                          :key  "menu Q")                  
@@ -156,12 +160,15 @@
 (defn draw-images [^Graphics g]
 (when (seq @core/board-history) 
 (let [b  (peek @core/board-history) ;(:board-atom @curr-game)
-      ps (remove nil? b) 
+      ps (ut/no-nils b) 
       balancer (ut/balance :up (:tile-size @curr-game))]
   (doseq [p ps]
-  (let [[bx by] (mapv balancer (if (vector? (:position p)) (:position p) 
-                                 (ut/Point->Vec (:position p))));the balanced coords
-         pic ((:image p))]  ;the actual picture
+  (let [loc (:position p)
+        [bx by] (map balancer (if (coll? loc) loc 
+                                  (ut/Point->Vec loc)));the balanced coords
+         pic (get-in @curr-game [:images (or (-> p :rank keyword) 
+                                             (-> p :direction)
+                                             (-> p :id)) (:direction p)])]  ;the actual picture 
     (.drawImage g pic bx by nil)))))) ;finally call g.drawImage() 
      
     
@@ -202,12 +209,12 @@
     (and (nil? sel) (not (nil? piece)))           
     (and (not (nil? sel)) (= (:direction piece) (:direction sel)))) 
        (do (refresh :highlighting? false 
-                      :hint nil
-                      :selection piece)
+                    :hint nil
+                    :selection piece)
           (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and clicked loc is nil then do nothing
-:else (when-let [sel-move (some #(when (or (= le-loc (:end-pos %))
-                                             (= le-loc (first (:end-pos %)))) %) 
+:else (when-let [sel-move (ut/some-element #(or (= le-loc (:end-pos %))
+                                           (= le-loc (first (:end-pos %))))
                                 (core/getMoves (:selection @knobs) (peek @core/board-history) true))]
    (core/execute! sel-move (:board-atom @curr-game)) 
       (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))];check if we have a winner 
@@ -216,9 +223,9 @@
        (refresh :whose-turn (turn (get-in @knobs [:selection :direction]))
                 :highlighting? false
                 :hint nil
-                :selection nil);;;;;;;;;;;;
+                :selection nil);;;;
        (ssw/repaint! canvas)
-       (ssw/config! status-label :text (str (:whose-turn @knobs) "moves next..."))))))      
+       (ssw/config! status-label :text (str (:whose-turn @knobs) " moves next..."))))))      
             
  
 (def canvas "The paintable canvas - our board"
@@ -283,16 +290,18 @@
               
                
 (defn hint "Ask the computer for a hint." 
-[pruning?] 
- ((:hinter @curr-game) 
-    (get-in @knobs [:selection :direction]) 
-    (peek @core/board-history) pruning?))
-          
+[pruning?]
+(let [[p1 p2] (:players @knobs)
+      curr-dir (get-in @knobs [:selection :direction])
+      curr-player (if (= curr-dir (:direction p1)) p1 p2)]   
+ ((:searcher curr-player) 
+    curr-player 
+    (peek @core/board-history) pruning?)) )
+         
 
 (defn set-laf! "Set look and feel of the ui, provided its name as a string."  
 [laf-name]
-(when-let [lf1 (some #(when (= laf-name (.getName %)) %)
-                     (UIManager/getInstalledLookAndFeels))]
+(when-let [lf1 (ut/some-element #(= laf-name (.getName %)) (UIManager/getInstalledLookAndFeels))]
  (UIManager/setLookAndFeel (.getClassName lf1))))
  
 
@@ -314,10 +323,10 @@
   (let [sen-spot (mapv (ut/balance :down) spot)
         sel-move (core/dest->Move board sel sen-spot (:mover @curr-game))]
 (when 
- (and (some #(when (= sen-spot (:end-pos %)) %)
+ (and (ut/some-element #(= sen-spot (:end-pos %))
             ((:team-moves @curr-game) board (:direction sel) false))
-  (some #(when (= sen-spot (:end-pos %)) %)
-        (core/getMoves sel board nil)))
+      (ut/some-element #(= sen-spot (:end-pos %))
+             (core/getMoves sel board nil)))
    (core/execute! sel-move (:board-atom @curr-game)) 
    (refresh :whose-turn (turn (:direction sel))
             :highlighting? false
