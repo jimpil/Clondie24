@@ -4,16 +4,17 @@
              [enclog.training :as evo]
              [enclog.normalization :refer [prepare input output target-storage]]
    )
-   (:import  [encog_java.customGA CustomNeuralGeneticAlgorithm Referee]
-             [org.encog.neural.networks BasicNetwork]))
+   (:import  [encog_java.customGA CustomNeuralGeneticAlgorithm Referee] 
+             [org.encog.ml MLRegression]))
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
 ;----------------------------------------<CODE>----------------------------------------------------------------------   
 (set! *unchecked-math* true)
+(set! *warn-on-reflection* true)
 
-(def mappings-8x8
+(def ^:const mappings-8x8
 "A vector of vectors. Outer vector represents the 64 (serial) positions chess-items can position themselves on. 
  Each inner vector represents the coordinates of that position on the 8x8 grid."
-(mapv #(apply vector-of :int %)
+;(mapv #(apply vector-of :int %)
 [[0 0] [1 0] [2 0] [3 0] [4 0] [5 0] [6 0] [7 0]
  [0 1] [1 1] [2 1] [3 1] [4 1] [5 1] [6 1] [7 1]
  [0 2] [1 2] [2 2] [3 2] [4 2] [5 2] [6 2] [7 2]
@@ -21,16 +22,16 @@
  [0 4] [1 4] [2 4] [3 4] [4 4] [5 4] [6 4] [7 4]
  [0 5] [1 5] [2 5] [3 5] [4 5] [5 5] [6 5] [7 5]
  [0 6] [1 6] [2 6] [3 6] [4 6] [5 6] [6 6] [7 6]
- [0 7] [1 7] [2 7] [3 7] [4 7] [5 7] [6 7] [7 7]]))
+ [0 7] [1 7] [2 7] [3 7] [4 7] [5 7] [6 7] [7 7]]);)
  
  
  (def ^:const mappings-3x3
 "A vector of vectors. Outer vector represents the 9 (serial) positions tic-tac-toe-items can position themselves on. 
  Each inner vector represents the coordinates of that position on the 3x3 grid."
-(mapv #(apply vector-of :int %)
+;(mapv #(apply vector-of :int %)
  [[0 0] [1 0] [2 0]
   [0 1] [1 1] [2 1]
-  [0 2] [1 2] [2 2]]))
+  [0 2] [1 2] [2 2]]);)
 
 (def board-history 
 "Log of the state of a game." 
@@ -42,7 +43,7 @@
  (when (not= n old)  
   (swap! dest conj n)))
   
-(defrecord Player [brain ^int direction searcher])  
+(defrecord Player [brain ^long direction searcher])  
 
 (defprotocol Piece "The Piece abstraction."
  (update-position [this new-position])
@@ -60,14 +61,18 @@
  (undo [this]) ;;optional in case you need mutation
  (getOrigin [this]))
  
+(extend-type nil
+Movable
+(try-move [_] nil)) 
+ 
 (defn- translate
 "Translates a position from 1d to 2d and vice-versa. 
 Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'." 
 ([^long i mappings] ;{:post [(not (nil? %))]}   
   (let [grid-loc (get mappings i)] ;will translate from 1d to 2d
-    (if-not (nil? grid-loc)  ;not found 
-      grid-loc 
-    (throw (IllegalStateException. (str "NOT a valid list-location:" i))))))
+    (if (nil? grid-loc)  ;not found 
+     (throw (IllegalStateException. (str "NOT a valid list-location:" i))) 
+     grid-loc) ))
 ([x y ^clojure.lang.PersistentVector mappings] ;{:post [(not= % -1)]} 
   (let [list-loc (.indexOf mappings [x y])] ;will translate from 2d to 1d
     (if (= list-loc -1) 
@@ -89,10 +94,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 "Returns the initial board for a game with pieces on correct starting positions for the particular game."
 (let [p1 (:north-player-start game)
       p2 (:south-player-start game)
-      vacant (- (:board-size game) 
-                (:total-pieces game))]
-(vec (flatten
-     (conj p2 (conj (repeat vacant nil) p1))))))
+      tps (:total-pieces game)
+      vacant (- (:board-size game)  tps)]
+(if (= 0 tps) 
+  (vec (repeat vacant nil))
+  (vec (flatten (conj p2 (conj (repeat vacant nil) p1)))) )))  ;;(into p2 (into (repeat vacant nil) p1))  
      
 (definline gather-team "Filters all the pieces with same direction dir on this board b." 
 [b dir]
@@ -111,6 +117,13 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (definline full-board? [b]
  `(not-any? nil? ~b))         
   
+(defn vacant? 
+ "Checks if a position [x, y] is vacant on the given board and mappings." 
+  [m b [x y :as pos]]
+ (nil? 
+  (get b (translate-position x y m)))) 
+  
+(def occupied? (complement vacant?))    
  
 (definline alive? [p]
 `(:alive (meta ~p)))
@@ -153,7 +166,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
      #_(populate-board)))) ;replace dead-pieces with nils
 #_(throw (IllegalStateException. (str coords " is NOT a valid position according to the mappings provided!")))
 
-(defn amove 
+#_(defn amove 
 "Same as 'move' but fast (expects a mutable array for board). Returns the mutated board." 
 [board p coords]
 (let [old-pos  (getListPosition p)
@@ -175,7 +188,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  "Constructor for creating moves from destinations. Prefer this to the direct constructor. 
  It wouldn't make sense to pass more than 1 mover-fns." 
 ^Move [b p dest mover]  
- (Move. p (partial (or mover move) b) dest))
+ (Move. p #((or mover move) b %1 %2) dest))
 
 (defn execute! [^Move m batom]
 ;(when (not= (:end-pos m) (-> m :p :position))
@@ -201,16 +214,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defn clear-history! []
  (swap! board-history empty)) 
-
-
-(defn vacant? 
- "Checks if a position [x, y] is vacant on the given board and mappings." 
-  [m b pos]
- (let [[x y] pos]
- (nil? 
-  (get b (translate-position x y m))))) 
-  
-(def occupied? (complement vacant?))   
+   
  
 (definline bury-dead [c]
  `(filter alive? ~c))  
@@ -232,7 +236,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
   (not (nil? (get ~b (translate-position imm-px# imm-py# ~m)))) true
 :else (recur (~walker imm-p#))))))
 
-(defn acollides? "Same as 'collides?' but deals with an array as b - not a vector."
+#_(defn acollides? "Same as 'collides?' but deals with an array as b - not a vector."
 [[sx sy] [ex ey] walker b m dir]
 (loop [[imm-x imm-y] (if (nil? walker) [ex ey] (walker [sx sy]))] ;if walker is nil make one big step to the end       
 (cond  
@@ -266,17 +270,18 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (definline anormalise "Deals directly with seqs (input) and arrays (output)." 
 [ins]
-`(prepare nil nil :how :array-range :raw-seq ~ins))
+`(prepare nil nil nil :how :array-range :raw-seq ~ins))
 
-(defn normalize-fields [ins outs]
- (prepare ins outs (target-storage :norm-array [64 nil])))
+(defn normalize-fields [ins outs game-map]
+ (prepare ins outs (target-storage :norm-array [(:board-size game-map) nil])))
 
 (defn neural-input "Returns appropriate number of inputs for the neural-net according to how big the board is." 
 [b dir fields?]
 ((if fields? input identity) 
   (for [t b] 
   (if (nil? t) 0 
-   (* dir (:direction t) (:value t)))))) 
+   (* dir (:direction t)
+          (get t :value 1)))))) 
   
 (definline neural-output "Creates output-field based on this InputField." 
 [input] 
@@ -284,82 +289,94 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 
 (defn neural-player 
 "Constructs a Player object for a particular game, given a brain b (a neural-net), a direction dir and a game-specific searching fn [:best or :random]."  
-([game ^BasicNetwork brain dir searcher]  
+([game ^MLRegression brain dir searcher extract-response]  
 (Player. 
    (fn [leaf _] ;;ignore 2nd arg - we already have direction
-     (let [normals (anormalise (neural-input leaf dir false))
-           output  (double-array 1)] 
-     (.compute brain normals output)
-     (aget ^doubles output 0)))
- dir (-> game :searchers searcher)))
- ([game ^BasicNetwork brain dir] 
-   (-> game :searchers :best)) )
+     (let [ins (neural-input leaf dir false)
+           normals (if (get :normalise-neural-input? game false) 
+                     (->> ins anormalise  (evo/data :basic)) 
+                     (evo/data :basic ins))  
+           output (-> brain (.compute normals) .getData)]  
+    (extract-response output leaf)  ))
+ dir (get-in game [:searchers searcher] 
+       (get-in game [:searchers :minmax]))))  
+([game ^MLRegression brain dir searcher] 
+   (neural-player game brain dir searcher (fn [a _] (aget ^doubles a 0)))) 
+ ([game ^MLRegression brain dir] 
+   (neural-player game brain dir :limited)) ) 
  
                
 (defn tournament
 "Starts a tournament between the 2 Players (p1, p2). If there is no winner, returns the entire history (vector) of 
  the tournament after 100 moves. If there is a winner, a 2d vector will be returned containing both the history (1st item) and the winner (2nd item).
  For games that can end without a winner, [history, nil] will be returned." 
-([game-details p1 p2 sb limit]
+([game-details p1 p2 sb]
 (reduce 
  (fn [history player] 
   (let [cb (peek history)]
     (if-let [win-dir ((:game-over?-fn game-details) cb)] 
        (reduced (vector history (condp = win-dir (:direction p1) p1 (:direction p2) p2 nil)))
-    (conj history (->> player
-                      :brain
-                      ((:searcher player) (:direction player) cb) 
+    (conj history (-> player
+                      ((:searcher player) cb (get game-details :pruning?)) 
                       :move
                       try-move))))) 
- [sb] (take limit (cycle [p1 p2])))) 
- ([game-details p1 p2 sb] 
-   (tournament game-details p1 p2 sb 100))
+ [sb] (take (:max-moves game-details) (cycle [p1 p2])))) 
  ([game-details p1 p2] 
-   (tournament game-details p1 p2 (starting-board game-details) 100)) )
+   (tournament game-details p1 p2 (starting-board game-details))) )
    
 (defn fast-tournament
 "Same as tournament but without keeping history. If there is a winner, returns the winning direction
  otherwise returns the last board. Intended to be used with genetic training."  
-([game-details p1 p2 sb limit]
+([game-details p1 p2 sb]
 (reduce 
  (fn [board player] 
   (if-let [win-dir ((:game-over?-fn game-details) board)] 
     (reduced (condp = win-dir (:direction p1) p1 (:direction p2) p2 board))
-         (->> player
-                :brain
-                ((:searcher player) (:direction player) board) 
-                :move
-                try-move))) 
-     sb (take limit (cycle [p1 p2])))) 
- ([game-details p1 p2 sb] 
-   (tournament game-details p1 p2 sb 100))
+         (-> player
+               ((:searcher player) board (:pruning? game-details)) 
+               :move
+               try-move))) 
+     sb (take (:max-moves game-details) (cycle [p1 p2])))) 
  ([game-details p1 p2] 
-   (tournament game-details p1 p2 (starting-board game-details) 100)) )   
+   (fast-tournament game-details p1 p2 (starting-board game-details))) )  
               
   
 (defn ga-fitness
-"Scores p1 after competing with p2 starting with board b." 
-([p1 p2 b]
-(let [game (-> 'details resolve var-get) ;;MUST EXIST!!!
-      winner (fast-tournament game p1 p2 (or b (starting-board game)) (:max-moves game))]  
-(condp = winner 
-       (:direction p1)  1 ;reward p1 with 1 point
-       (:direction p2) -2 ;penalise p1 with -2 points
+"Scores p1 after competing with p2 using tournament-fn." 
+[tournament-fn p1 p2 &{:keys[reward penalty] :or {reward 1 penalty -1}}] 
+(let [winner (tournament-fn p1 p2)]  
+(condp = (:direction winner) 
+       (:direction p1) reward ;reward p1 with 1 point
+       (:direction p2) penalty ;penalise p1 with -1 points
        0)))               ;give 0 points - noone won 
-([p1 p2]
-  (ga-fitness p1 p2 nil)) )
+
   
   
 (defn GA 
-[game brain pop-size & {:keys [randomizer to-mate to-mutate thread-no opponent-searcher total-games]
+[game brain pop-size & {:keys [randomizer to-mate to-mutate thread-no total-tournaments ga-type fitness] 
                    :or {randomizer (evo/randomizer :nguyen-widrow)
                         to-mate   0.2
                         to-mutate 0.1
-                        opponent-searcher :best
-                        total-games (int 5)
+                        total-tournaments (int 5)
+                        ga-type :custom
                         thread-no (+ 2 (.. Runtime getRuntime availableProcessors))}}]
-(doto 
-  (CustomNeuralGeneticAlgorithm. brain randomizer (Referee. game opponent-searcher total-games) pop-size to-mate to-mutate)
-  (.setThreadCount thread-no)))                                       
+(case ga-type
+   :custom                        
+     (doto 
+       (CustomNeuralGeneticAlgorithm. brain randomizer (Referee. game fitness total-tournaments) pop-size to-mutate to-mate)
+       (.setThreadCount thread-no))  
+   :default (doto (evo/trainer :genetic 
+                               :network brain 
+                               :randomizer randomizer 
+                               :minimize? false 
+                               :population-size pop-size 
+                               :fitness-fn fitness 
+                               :mutation-percent to-mutate 
+                               :mate-percent to-mate)  
+                  (.setThreadCount thread-no))
+   (throw (IllegalArgumentException. "Only :custom and :default GAs are supported!"))) )
+   
+(definline train [trainer iterations strategies]
+  `(evo/train ~trainer Double/NEGATIVE_INFINITY ~iterations ~strategies))                                        
                  
  
