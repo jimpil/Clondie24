@@ -96,7 +96,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
       p2 (:south-player-start game)
       tps (:total-pieces game)
       vacant (- (:board-size game)  tps)]
-(if (= 0 tps) 
+(if (zero? tps) 
   (vec (repeat vacant nil))
   (vec (flatten (conj p2 (conj (repeat vacant nil) p1)))) )))  ;;(into p2 (into (repeat vacant nil) p1))  
      

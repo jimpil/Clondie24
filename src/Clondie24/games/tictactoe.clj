@@ -4,7 +4,7 @@
               [Clondie24.lib.search :as s]
               [Clondie24.lib.gui :as gui]
               [enclog.nnets :as ai] [enclog.util :as persi] [enclog.training :as evo]
-              [clojure.core.match :refer [match]]
+              ;[clojure.core.match :refer [match]]
               [clojure.set :as sets]
               :reload)
     (:import [Clondie24.lib.core Player]
@@ -98,15 +98,20 @@
     (assoc board (core/getListPosition np) np))) 
                      
 
-(defn match-win "Returns the winning direction [1 , -1] or nil. " 
+#_(defn match-win "Returns the winning direction [1 , -1] or nil. " 
 [b]
-(for [[x y z :as rows] winning-sets]
-     (match (mapv #(get dir->shape (:direction (get b %))) rows) ;;[(:shape (get b x)) (:shape (get b y)) (:shape (get b z))]        
+(for [[x y z :as rows] winning-sets] 
+     (match (mapv #(get dir->shape (:direction (get b %))) rows) ;;[(:shape (get b x)) (:shape (get b y)) (:shape (get b z))]         
         ['X 'X 'X]  1
         ['O 'O 'O] -1
-       :else        0)))  ;;(0 0 0 1  0 0 0 0)            
+       :else        0)))  ;;(0 0 0 1  0 0 0 0) 
+       
+(defn match-win [b]
+ (for [a-win  winning-sets]       
+   (condp = (mapv #(->> % (get b) :direction dir->shape)  a-win)               
+      ['X 'X 'X]  1
+      ['O 'O 'O] -1  0)))
  
-
 (defn winner "Returns the winning shape [X , O]" 
   [b]
   (let [winning-combinations (match-win b)]
