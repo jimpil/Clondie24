@@ -108,38 +108,7 @@
 `(-> (Math/abs (- (first ~e) 
                   (first ~s))) 
       (rem  2)
-      zero?))  
-   
-(defn checker-moves++ 
-"Returns all the possible destinations for a checker. 
- If moving to a particualr destination involves kill(s), the captured pieces along the way 
- will be attached as metadata to that coordinate." 
-([m boa [x y :as pos] dir all?]
- (let [diag (diagonal-neighbours pos 2)
-       front4 (filter (if (pos? dir) ;;if moving downwards
-                          (fn [[_ ky]] (> ky y)) 
-                          (fn [[_ ky]] (< ky y))) diag)  
-       dir-options (->> front4 
-                     (sort-by  #(Math/abs (- y (second %)))) ;;sort them by y distance
-                     (group-by #(> (first %) x)))]   ;;group them by side (left/right)                                        
- (map 
-   (fn [[cx cy :as cpos]]
-     (if-not (ut/jump? pos cpos) cpos
-        (let [nkills  (Math/abs (int (/ (- cx x) 2))) 
-              trail (ut/walk (ut/resolve-direction pos cpos) pos (* 2 nkills))] 
-       (with-meta cpos {:kills (take-nth 2 (next trail))}))))                                                 
- (mapcat
-  (fn [[_ [[fx fy :as fc][sx sy :as sc]]]]
-    (if (core/vacant? m boa fc) (if all? [fc] []) 
-    (try 
-      (let [opp-dir (:direction (core/occupant m boa fc))
-            enemy?  (not= dir opp-dir)] 
-      (if (and (core/vacant? m boa sc) enemy?)                   
-        (conj (checker-moves++ m boa sc dir false) sc) []))
-   (catch IllegalStateException e [])))) dir-options)) ))       
-([m boa pos dir] 
-  (checker-moves++ m boa pos dir true)) )
-  
+      zero?))   
 
          
 (defn checker-moves 
