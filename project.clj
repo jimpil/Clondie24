@@ -4,10 +4,9 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.5.1"]
-                 [org.clojure/core.logic "0.8.4" ] ; 
-                 ;[org.clojure/core.match "0.2.0"]
+                 ;[org.clojure/core.logic "0.8.4" ] 
                  [org.clojure/tools.nrepl "0.2.3"] 
-                 [org.clojure/core.memoize "0.5.6"]
+                ;[org.clojure/core.memoize "0.5.6"]
                  [org.clojure/math.combinatorics "0.0.7"]
                  [seesaw "1.4.3" :exclusions[[org.clojure/clojure]]]
                  [enclog "0.6.2"]

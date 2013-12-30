@@ -14,24 +14,13 @@
 (def ^:const mappings-8x8
 "A vector of vectors. Outer vector represents the 64 (serial) positions chess-items can position themselves on. 
  Each inner vector represents the coordinates of that position on the 8x8 grid."
-;(mapv #(apply vector-of :int %)
-[[0 0] [1 0] [2 0] [3 0] [4 0] [5 0] [6 0] [7 0]
- [0 1] [1 1] [2 1] [3 1] [4 1] [5 1] [6 1] [7 1]
- [0 2] [1 2] [2 2] [3 2] [4 2] [5 2] [6 2] [7 2]
- [0 3] [1 3] [2 3] [3 3] [4 3] [5 3] [6 3] [7 3]
- [0 4] [1 4] [2 4] [3 4] [4 4] [5 4] [6 4] [7 4]
- [0 5] [1 5] [2 5] [3 5] [4 5] [5 5] [6 5] [7 5]
- [0 6] [1 6] [2 6] [3 6] [4 6] [5 6] [6 6] [7 6]
- [0 7] [1 7] [2 7] [3 7] [4 7] [5 7] [6 7] [7 7]]);)
+  (ut/grid 8 8))
  
  
- (def ^:const mappings-3x3
+(def ^:const mappings-3x3
 "A vector of vectors. Outer vector represents the 9 (serial) positions tic-tac-toe-items can position themselves on. 
  Each inner vector represents the coordinates of that position on the 3x3 grid."
-;(mapv #(apply vector-of :int %)
- [[0 0] [1 0] [2 0]
-  [0 1] [1 1] [2 1]
-  [0 2] [1 2] [2 2]]);)
+ (ut/grid 3 3))
 
 (def board-history 
 "Log of the state of a game." 
@@ -123,7 +112,11 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
  (nil? 
   (get b (translate-position x y m)))) 
   
-(def occupied? (complement vacant?))    
+(def occupied? (complement vacant?))
+
+(defn occupant  
+  [m b [x y :as pos]]
+  (get b (translate-position x y m)))    
  
 (definline alive? [p]
 `(:alive (meta ~p)))
@@ -193,6 +186,7 @@ Mappings should be either 'checkers-board-mappings' or 'chess-board-mappings'."
 (defn execute! [^Move m batom]
 ;(when (not= (:end-pos m) (-> m :p :position))
  (reset! batom (try-move m)))
+ ;(swap! batom (fn [& args] (try-move m)))
 
 (defn unchunk
   "Returns a fully unchunked lazy sequence. Might need it for massive boards." 

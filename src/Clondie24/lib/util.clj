@@ -223,7 +223,11 @@
 (defn inspect-boards [bs] ;the boards
 (map inspect-table bs))
 
-(defn walk* [direction [sx sy]]
+(defn walk* 
+([direction start distance]
+(take (inc distance)
+(iterate 
+(fn [[sx sy]] 
 (case  direction
           :north [sx (dec sy)]
           :south [sx (inc sy)]
@@ -232,13 +236,21 @@
           :north-east [(inc sx) (dec sy)]
           :north-west [(dec sx) (dec sy)]
           :south-east [(inc sx) (inc sy)]
-          :south-west [(dec sx) (inc sy)]))
+          :south-west [(dec sx) (inc sy)])) start))) 
+([direction start-pos]
+  (walk* direction start-pos 1)))
+  
+(definline jump? [s e]
+`(-> (Math/abs (- (first ~e) 
+                  (first ~s))) 
+      (rem  2)
+      zero?))            
 
 (def walk (memoize walk*))          
 
 (defn make-walker [direction rank]
 (when-not (= rank 'knight) ;;knight jumps - doesn't walk
-  #(walk direction %)))
+  #(last (walk direction %))))
 
 (defn within-limits? [[xlim ylim] [x y]]
  (and (>= x 0) (< x xlim)  
@@ -268,6 +280,14 @@
 (with-open [in (java.io.BufferedReader. 
                (java.io.InputStreamReader. (.openStream ip-url)))]
   (.readLine in))))
+  
+(defn grid 
+ "Returns a grid represented as a sequence (vector) of co-ordinates (vectors))." 
+ [width height]
+ (vec 
+   (for [y (range height) 
+         x (range width)] 
+    [x y])))   
 
 (definline some-element 
 "Like some but returns the element for which (pred x) returned a truthy value rather than the truthy value itself. 

@@ -3,6 +3,8 @@
               [Clondie24.lib.util :as ut]
               [Clondie24.lib.core :as core]))
               
+(set! *unchecked-math* true)              
+              
 (defn round-neighbours 
 "Returns all the circular neighbouring positions using the specified distance on a dimx*dimy board."
 ([[x y :as coord] distance [dimx dimy]]
@@ -72,16 +74,17 @@
 (defn king-moves [[x y :as pos]]
   (round-neighbours pos 1)) 
   
-(defn pawn-moves [b [x y :as pos] dir]
+(defn pawn-moves [mappings b [x y :as pos] dir]
   (let [valid? (fn [[newX newY :as new-pos]]
-                 (let [vacant? (core/vacant? core/mappings-8x8 b new-pos)]  
+                 (let [vacant?  (core/vacant? mappings b new-pos)]  
                    (cond 
                       (= x newX) vacant?
-                      vacant?  false)))
+                      vacant?  false 
+                      :else true)))
         kings   (king-moves pos) ;;use the king to get the surrouding positions          
         front3  (filter (if (pos? dir) ;;if moving downwards
-                          (fn [[kx ky]] (> ky y)) ;;keep greater ys
-                          (fn [[kx ky]] (< ky y))) ;;else keep smaller ys
+                          (fn [[_ ky]] (> ky y)) ;;keep greater ys
+                          (fn [[_ ky]] (< ky y))) ;;else keep smaller ys
                   kings)
         front4  (if (pos? dir) 
                   (if (= y 1) (conj front3 [x (+ y 2)]) front3)
@@ -99,5 +102,86 @@
                     (and (= nx (dec x)) (= ny (- y 2)))
                     (and (= nx (- x 2)) (= ny (dec y)))
                     (and (= nx (- x 2)) (= ny (inc y)))))]
-   (filter valid? around)))     
+   (filter valid? around))) 
+
+(definline jump? [s e]
+`(-> (Math/abs (- (first ~e) 
+                  (first ~s))) 
+      (rem  2)
+      zero?))  
+   
+(defn checker-moves++ 
+"Returns all the possible destinations for a checker. 
+ If moving to a particualr destination involves kill(s), the captured pieces along the way 
+ will be attached as metadata to that coordinate." 
+([m boa [x y :as pos] dir all?]
+ (let [diag (diagonal-neighbours pos 2)
+       front4 (filter (if (pos? dir) ;;if moving downwards
+                          (fn [[_ ky]] (> ky y)) 
+                          (fn [[_ ky]] (< ky y))) diag)  
+       dir-options (->> front4 
+                     (sort-by  #(Math/abs (- y (second %)))) ;;sort them by y distance
+                     (group-by #(> (first %) x)))]   ;;group them by side (left/right)                                        
+ (map 
+   (fn [[cx cy :as cpos]]
+     (if-not (ut/jump? pos cpos) cpos
+        (let [nkills  (Math/abs (int (/ (- cx x) 2))) 
+              trail (ut/walk (ut/resolve-direction pos cpos) pos (* 2 nkills))] 
+       (with-meta cpos {:kills (take-nth 2 (next trail))}))))                                                 
+ (mapcat
+  (fn [[_ [[fx fy :as fc][sx sy :as sc]]]]
+    (if (core/vacant? m boa fc) (if all? [fc] []) 
+    (try 
+      (let [opp-dir (:direction (core/occupant m boa fc))
+            enemy?  (not= dir opp-dir)] 
+      (if (and (core/vacant? m boa sc) enemy?)                   
+        (conj (checker-moves++ m boa sc dir false) sc) []))
+   (catch IllegalStateException e [])))) dir-options)) ))       
+([m boa pos dir] 
+  (checker-moves++ m boa pos dir true)) )
+  
+
+         
+(defn checker-moves 
+"Returns all the possible destinations for a checker. 
+ If moving to a particular destination involves kill(s), the captured pieces along the way 
+ will be attached as metadata to that coordinate." 
+([m boa [x y :as pos] dir all? pdir] ;pdir is for price direction where we need to negate the original direction
+ (let [diag (diagonal-neighbours pos 2)
+       front4 (filter (if (pos? dir) ;;if moving downwards
+                          (fn [[_ ky]] (> ky y)) 
+                          (fn [[_ ky]] (< ky y))) diag)  
+       all-moves (->> front4 
+                     (sort-by  #(Math/abs (- y (second %)))) ;;sort them by y distance
+                     (group-by #(> (first %) x))   ;;group them by side (left/right)
+                     (mapcat
+  			(fn [[_ [[fx fy :as fc][sx sy :as sc]]]]
+   			 (if (core/vacant? m boa fc) (if all? [fc] []) 
+   			  (try 
+      			    (let [enemy?  (->> fc (core/occupant m boa) :direction (not= (* dir pdir)))]  
+      			      (if (and (core/vacant? m boa sc) enemy?)                   
+        			(conj (checker-moves m boa sc dir false pdir) (with-meta sc {:kills [fc] :origin pos})) []))
+   		          (catch IllegalStateException e [])))) )) ]
+ (map 
+   (fn [cpos]
+     (if-let [kills (-> cpos meta :kills)]
+       (loop [tkills kills
+              current (ut/some-element #(= (-> cpos meta :origin) %)  all-moves)] ;go one back but don't leave metadata behind
+         (let [pre-kill (-> current 
+                          meta 
+                          :kills
+                          first)] 
+           (if-not pre-kill (vary-meta cpos assoc :kills tkills) 
+         (recur (conj tkills pre-kill) 
+                (ut/some-element #(= (-> current meta :origin) %)  all-moves)))))
+       cpos)) 
+   all-moves) ))       
+([m boa pos dir] 
+  (checker-moves m boa pos dir true 1)) )                             
+                           
+(defn prince-moves [m boa pos dir]
+ (concat (checker-moves m boa pos dir)
+         (checker-moves m boa pos (- dir) true -1)))
+
+
                      

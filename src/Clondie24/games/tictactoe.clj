@@ -3,8 +3,9 @@
               [Clondie24.lib.core :as core]
               [Clondie24.lib.search :as s]
               [Clondie24.lib.gui :as gui]
-              [enclog.nnets :as ai] [enclog.util :as persi] [enclog.training :as evo]
-              ;[clojure.core.match :refer [match]]
+              [enclog.nnets :as ai]
+              [enclog.util :as persi] 
+              [enclog.training :as evo]
               [clojure.set :as sets]
               :reload)
     (:import [Clondie24.lib.core Player]

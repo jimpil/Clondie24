@@ -214,7 +214,7 @@
           (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and clicked loc is nil then do nothing
 :else (when-let [sel-move (ut/some-element #(or (= le-loc (:end-pos %))
-                                           (= le-loc (first (:end-pos %))))
+                                                (= le-loc (first (:end-pos %))))
                                 (core/getMoves (:selection @knobs) (peek @core/board-history) true))]
    (core/execute! sel-move (:board-atom @curr-game)) 
       (when-let [res ((:referee-gui @curr-game) (peek @core/board-history))];check if we have a winner 
@@ -320,14 +320,13 @@
              (ssw/repaint! canvas))
   (nil? sel) nil ; if selected piece is nil and lcicked loc is nil then do nothing
 :else 
-  (let [sen-spot (mapv (ut/balance :down) spot)
-        sel-move (core/dest->Move board sel sen-spot (:mover @curr-game))]
-(when 
- (and (ut/some-element #(= sen-spot (:end-pos %))
-            ((:team-moves @curr-game) board (:direction sel) false))
-      (ut/some-element #(= sen-spot (:end-pos %))
-             (core/getMoves sel board nil)))
-   (core/execute! sel-move (:board-atom @curr-game)) 
+  (let [sen-spot (mapv (ut/balance :down) spot) 
+        in-team (ut/some-element #(= sen-spot (:end-pos %))
+                   ((:team-moves @curr-game) board (:direction sel) false))
+        in-self (ut/some-element #(= sen-spot (:end-pos %))
+                   (core/getMoves sel board nil))]
+(when (and in-team in-self)
+   (core/execute! in-self (:board-atom @curr-game)) 
    (refresh :whose-turn (turn (:direction sel))
             :highlighting? false
             :hint nil
@@ -361,7 +360,7 @@
  (set-laf! "Nimbus") ;try to look nice
   (deliver curr-game game-map) ;firstly make the gui aware of what game we want it to display
    (ssw/invoke-later 
-     (doto (arena) ssw/show!)))
+     (doto (arena)  ssw/show!)))
                                                 
                
 (defn show-repl! "Pop up a local working REPL"

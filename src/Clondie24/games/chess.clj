@@ -2,10 +2,10 @@
     (:require [Clondie24.lib.util :as ut] 
               [Clondie24.lib.core :as core]
               [Clondie24.lib.search :as s]
-              [Clondie24.lib.rules :as rul]
+              [Clondie24.lib.fmoves :as fmov]
               [Clondie24.lib.gui :as gui]
               [enclog.nnets :as ai]
-              [clojure.core.memoize :as memo] 
+              ;[clojure.core.memoize :as memo] 
               #_[clj-tuple :refer [tuple]] :reload)
     (:import [Clondie24.lib.core Player])
 )
@@ -66,7 +66,7 @@
 (definline pawn-area [b x y direction]
  `(if (neg? ~direction) 
    (vector (try (get ~b (core/translate-position ~x (dec ~y) board-mappings-chess)) 
-           (catch Exception ~'e :out)) ;;returning :out because nil means vacant in rules.clj
+           (catch Exception ~'e :out)) ;;returning :out because nil means vacant
            (try (get ~b (core/translate-position ~x (- ~y 2) board-mappings-chess))
            (catch Exception ~'e :out))
            (try (get ~b (core/translate-position (dec ~x) (dec ~y) board-mappings-chess))
@@ -97,14 +97,17 @@
      (concat (filter #(core/occupied? board-mappings-chess b %) front-diag) 
              (filter #(= 1 (* dir (- (second %) y))) in-front)))) )           
            
-(def pawn-moves (memo/lru #(rul/pawn-moves board-mappings-chess %1 %2 %3 %4) :lru/threshold 1024))             
+;(def pawn-moves (memo/lru #(fmov/pawn-moves board-mappings-chess %1 [%2 %3] %4) :lru/threshold 1024))             
 
-(def chess-moves {:pawn      #(pawn-moves (pawn-area %1 %2 %3 %4) %2 %3 %4)
-                  :rook      rul/rook-moves
-                  :bishop    rul/bishop-moves
-                  :knight    rul/knight-moves
-                  :queen     rul/queen-moves
-                  :king      rul/king-moves})
+(def chess-moves {:pawn     #(fmov/pawn-moves  board-mappings-chess %1 [%2 %3] %4) 
+                             ;;#(pawn-moves #_(pawn-area %1 %2 %3 %4) %1 [%2 %3] %4) 
+                  :rook      fmov/rook-moves
+                  :bishop    fmov/bishop-moves
+                  :knight    fmov/knight-moves
+                  :queen     fmov/queen-moves
+                  :king      fmov/king-moves})
+                  
+                  
                                    
 (defn rank->moves 
 "Returns all legal moves of piece p depending on rank of p (excluding pawn). Will be called only once to buffer the moves." 
@@ -112,7 +115,7 @@
 (let [[x y] (:position p)            ;[[x y] (:position p) 
       r (keyword (:rank p))
       d (:direction p)]      
-((r chess-moves) x y))) ;will return a fn which is called with current x and y 
+((r chess-moves) [x y]))) ;will return a fn which is called with current x and y 
 ;(if (= (class p) (Class/forName "Clondie24.games.chess.ChessPiece2"))
 ;(ut/Point->Vec pos) pos))))  
                          
@@ -404,8 +407,9 @@ black? specifies the side of the board where the pieces should be placed (true f
  (core/GA details brain pop-size :fitness chess-tournament-fast)) 
  
  
-#_(ut/data->string buffered-moves "machine-performance.cheat") 
-(def buffered-moves (ut/string->data "machine-performance.cheat" details))  ;it's faster to read them from file than recalculate       
+;(ut/data->string buffered-moves "machine-performanceNEW.cheat") 
+
+(defonce buffered-moves (ut/string->data "machine-performanceNEW.cheat" details))  ;it's faster to read them from file than recalculate       
 
 (defn -main 
 "Starts a graphical (swing) Chess game." 

@@ -2,7 +2,7 @@
      (:require [Clondie24.lib.util :as ut] 
                [Clondie24.lib.core :as core]
                [Clondie24.lib.search :as s]
-               [Clondie24.lib.rules :as rul]
+               [Clondie24.lib.fmoves :as fmov]
                [Clondie24.lib.gui :as gui] :verbose :reload)
 )
 ;----------------------------------------<SOURCE>--------------------------------------------------------------------
@@ -22,35 +22,29 @@
 (def checkers-board-colours [(ut/hex->color '0xffdead) ;funny colour name!
                              (ut/hsb->color 0.931 0.863 0.545)])
                        
-(def checkers-moves {:soldier  (partial rul/checker-moves board-mappings-checkers) 
-                     :prince   (partial rul/prince-moves board-mappings-checkers)})
+(def checkers-moves {:soldier  (partial fmov/checker-moves board-mappings-checkers) 
+                     :prince   (partial fmov/prince-moves board-mappings-checkers)})
 (def prince-row {1 7 
                 -1 0})                     
                 
 
-(definline jump? [s e]
-`(-> (Math/abs (- (first ~e) 
-                  (first ~s))) 
-      (rem  2)
-      (= 0)))                                  
+                                  
                                                             
 #_(defn between [sp ep]
 (ut/walk (ut/resolve-direction sp ep) sp))
 
 (defn move [board p coords]
-(if-not (jump? (:position p) coords) (core/move board p coords) ;;use the one from core if there is no jump
-(let [newPiece (core/update-position p coords)
-      old-pos  (core/getListPosition p)
-      new-pos  (core/getListPosition newPiece)
-      [bx by] (ut/walk (ut/resolve-direction (:position p) coords) (:position p))] ;the piece in between
-(assoc board old-pos nil
-             new-pos newPiece
-            (core/translate-position bx by board-mappings-checkers)  nil))))
+(if-let [to-kill (-> coords meta :kills)] 
+  (reduce 
+    (fn [b [kx ky]]
+     (assoc b (core/translate-position kx ky board-mappings-checkers)  nil)) 
+  (core/move board p coords) to-kill)
+(core/move board p coords))) ;;use the one from core if there are no kills
      
      
 (definline team-moves "Jumps have priority." [b dir & more]
 `(let [all# (into [] (core/team-moves ~b ~dir nil)) ;;our specific move-fn
-      jumps# (filter #(jump? (get-in % [:p :position]) (:end-pos %))  all#)]
+      jumps# (filter #(ut/jump? (get-in % [:p :position]) (:end-pos %))  all#)]
  (if (seq jumps#) jumps# all#)))      
 
 (defrecord CheckersPiece [^java.awt.Image image
@@ -67,9 +61,9 @@
  (getPoint [this] (ut/make-point position))
  ;(getMoves [this b _] (core/getMoves this b _ true))
  (getMoves [this b _] 
-                  (let [[x y] position]
+                  ;(let [[x y] position]
                    (map #(core/dest->Move b this % move)   ;;our specific mover
-                   (((keyword rank) checkers-moves) b x y direction))))
+                   (((keyword rank) checkers-moves) b position direction)))
  Object
  (toString [this] 
    (println "Checker (" rank ") at position:" (core/getListPosition this) " ->" position)) )
@@ -119,11 +113,11 @@
                :images checkers-images
                :characteristics [:image :position :rank :value :direction]  
                :board-size 64
-               :arena-size [421 :by 506]
+               :arena-size [421 :by 530]
                :tile-size 50 
                :alternating-colours checkers-board-colours
                :tiles (map vector (for [x (range 0 421 50) 
-                                         y (range 0 506 50)] [x y]) 
+                                         y (range 0 530 50)] [x y]) 
                                   (cycle checkers-board-colours))
                :total-pieces 48 ;24 ;;temporary hack
                :obligatory-move 'jump
@@ -134,7 +128,7 @@
                :scorer score-by-count
                :pref-depth 6
                :board-atom  current-checkers
-               :record-name "Clondie24.checkers.CheckersPiece"
+               :record-name (.getName CheckersPiece)
                :game-starter start-checkers!
                :mappings board-mappings-checkers
                :north-player-start  (starting-checkers true)
